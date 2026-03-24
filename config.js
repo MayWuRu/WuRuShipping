@@ -1,7 +1,8 @@
 /**
- * ไฟล์นี้ใช้สำหรับเก็บค่า Config หรือค่าที่เป็นความลับ
+ * WuRu Shipping - Configuration File
+ * สำหรับเก็บค่าลายนิ้วมือดิจิทัล (Hash) ของรหัสผ่าน
  */
-const SECRETS = {
-    // รหัสผ่านที่ผ่านการเข้ารหัส (SHA-256 Hash)
+window.SECRETS = {
+    // ค่า SHA-256 Hash สำหรับตรวจสอบสิทธิ์ Admin
     ADMIN_HASH: '44177651a8d055490a072d621b190c7419ec61f953c896e3828731050c82270f'
 };
