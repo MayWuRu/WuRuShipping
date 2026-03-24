@@ -1,8 +1,8 @@
 /**
  * WuRu Shipping - Configuration File
- * สำหรับเก็บค่าลายนิ้วมือดิจิทัล (Hash) ของรหัสผ่าน
+ * สำหรับเก็บค่าลายนิ้วมือดิจิทัล (Hash) ของรหัสผ่านที่ถูกต้อง
  */
 window.SECRETS = {
-    // ค่า SHA-256 Hash สำหรับตรวจสอบสิทธิ์ Admin
-    ADMIN_HASH: '44177651a8d055490a072d621b190c7419ec61f953c896e3828731050c82270f'
+    // ค่า SHA-256 Hash ที่ถูกต้องของรหัสผ่าน "6360"
+    ADMIN_HASH: '8ad38db8cfc0cf1f9d8190d2c0301b97ddc148359388daf00c0ba4bb058cee91'
 };
