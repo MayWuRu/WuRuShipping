@@ -9,6 +9,7 @@
     <!-- PWA & Config -->
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
     <script src="config.js"></script>
 
     <!-- Tailwind CSS -->
@@ -382,9 +383,6 @@
         <p class="text-lg font-semibold text-slate-700" id="loadingText">กำลังประมวลผลข้อมูล...</p>
     </div>
 
-    <!-- ไฟล์ Config สำหรับ SECRETS (อย่าลืมลบส่วนนี้ออกหากย้ายไปไว้ที่ Head แล้ว) -->
-    <script src="config.js"></script>
-
     <script>
         /* =========================================================================
            1. CORE LOGIC: SUPER NORMALIZER (Utility functions)
@@ -445,18 +443,20 @@
         });
 
         function login(role, isAutoLogin = false) { 
+            console.log(typeof SECRETS);
+            
             if (role === 'admin' && !isAutoLogin) { 
                 const inputPass = document.getElementById('adminPassword').value;
                 const hashedPass = CryptoJS.SHA256(inputPass).toString();
                 
-                // ตรวจสอบว่ามีตัวแปร SECRETS และ SECRETS.ADMIN_HASH อยู่จริงหรือไม่
-                if (typeof SECRETS === 'undefined' || !SECRETS.ADMIN_HASH) {
+                // ตรวจสอบเงื่อนไขการเช็คให้รองรับการโหลดไฟล์ที่อาจจะช้าบน Server
+                if (!(window.SECRETS && window.SECRETS.ADMIN_HASH)) {
                     alert("เข้าสู่ระบบไม่ได้: ไม่พบไฟล์ตั้งค่าความปลอดภัย (config.js)");
                     return;
                 }
                 
-                // เทียบ Hash ที่ได้กับ SECRETS.ADMIN_HASH
-                if (hashedPass !== SECRETS.ADMIN_HASH) {
+                // เทียบ Hash ที่ได้กับ window.SECRETS.ADMIN_HASH
+                if (hashedPass !== window.SECRETS.ADMIN_HASH) {
                     alert("รหัสผ่านไม่ถูกต้อง"); 
                     return; 
                 }
@@ -746,7 +746,7 @@
             state.page = page;
             document.getElementById('nav-single').className = page === 'single' ? 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors' : 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
             document.getElementById('nav-compare').className = page === 'compare' ? 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors' : 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
-            document.getElementById('pageTitle').innerText = page === 'single' ? 'ตรวจสอบขนส่งเดียว' : 'เปรียบเทียบทุกขนส่ง';
+            document.getElementById('pageTitle').innerText = page === 'single' ? 'ตรวจสอบขนเดียว' : 'เปรียบเทียบทุกขนส่ง';
             if (page === 'single') { document.getElementById('singleCarrierWrapper').classList.remove('hidden'); document.getElementById('carrierFilterSection').classList.add('hidden'); } 
             else { document.getElementById('singleCarrierWrapper').classList.add('hidden'); document.getElementById('carrierFilterSection').classList.remove('hidden'); populateFilterList(); }
             document.getElementById('resultSection').classList.add('hidden');
