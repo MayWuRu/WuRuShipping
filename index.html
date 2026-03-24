@@ -10,6 +10,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" type="image/png" href="icon.png">
+    <!-- โหลด config.js ก่อนสคริปต์ตัวอื่นๆ เพื่อเตรียมค่า SECRETS ให้พร้อมใช้งาน -->
     <script src="config.js"></script>
 
     <!-- Tailwind CSS -->
@@ -443,17 +444,18 @@
         });
 
         function login(role, isAutoLogin = false) { 
-            console.log(typeof SECRETS);
-            
             if (role === 'admin' && !isAutoLogin) { 
-                const inputPass = document.getElementById('adminPassword').value;
-                const hashedPass = CryptoJS.SHA256(inputPass).toString();
+                // เพิ่ม console.log เช็คสถานะการโหลดไฟล์
+                console.log("Checking SECRETS:", window.SECRETS);
                 
                 // ตรวจสอบเงื่อนไขการเช็คให้รองรับการโหลดไฟล์ที่อาจจะช้าบน Server
-                if (!(window.SECRETS && window.SECRETS.ADMIN_HASH)) {
-                    alert("เข้าสู่ระบบไม่ได้: ไม่พบไฟล์ตั้งค่าความปลอดภัย (config.js)");
+                if (typeof window.SECRETS === 'undefined' || !window.SECRETS.ADMIN_HASH) {
+                    alert("ระบบขัดข้อง: ไม่สามารถดึงข้อมูลจาก config.js ได้ กรุณารีเฟรชหน้าจอ (Ctrl+F5)");
                     return;
                 }
+                
+                const inputPass = document.getElementById('adminPassword').value;
+                const hashedPass = CryptoJS.SHA256(inputPass).toString();
                 
                 // เทียบ Hash ที่ได้กับ window.SECRETS.ADMIN_HASH
                 if (hashedPass !== window.SECRETS.ADMIN_HASH) {
