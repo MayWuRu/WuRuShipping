@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <title>WuRu Shipping</title>
+    
+    <!-- PWA & Config -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <script src="config.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <!-- CryptoJS (สำหรับ Security & Hashing) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Toggle Switch Styles */
+        .toggle-checkbox:checked { right: 0; border-color: #10B981; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #10B981; }
+
+        /* Hide Number Input Arrows */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex overflow-hidden selection:bg-blue-200">
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 transform transition-all">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-600 mb-4">
+                    <i class="fa-solid fa-truck-fast text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800">WuRu Shipping</h2>
+                <p class="text-sm text-slate-500 mt-2">กรุณาเลือกโหมดเพื่อใช้งาน</p>
+            </div>
+
+            <div class="space-y-4">
+                <button onclick="login('staff')" class="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user"></i>เข้าสู่ระบบแบบ Staff
+                </button>
+                
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-slate-200"></div>
+                    <span class="flex-shrink-0 mx-4 text-slate-400 text-sm">หรือ</span>
+                    <div class="flex-grow border-t border-slate-200"></div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="relative">
+                        <input type="password" id="adminPassword" placeholder="รหัสผ่าน Admin" class="w-full pl-4 pr-10 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
+                        <i class="fa-solid fa-lock absolute right-3 top-3.5 text-slate-400"></i>
+                    </div>
+                    <button onclick="login('admin')" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-tie"></i> เข้าสู่ระบบแบบ Admin
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Priority Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/80 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 lg:p-8 max-h-[95vh] overflow-y-auto hide-scroll">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-slate-800"><i class="fa-solid fa-sliders text-blue-600 mr-2"></i>ตั้งค่า Logic</h2>
+                <button onclick="closeSettings()" class="text-slate-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-xmark text-2xl"></i></button>
+            </div>
+            
+            <div class="space-y-6">
+                <!-- 1. Minimum Profit -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800 mb-2 border-l-4 border-green-500 pl-2">1. กำหนดกำไรขั้นต่ำ (Minimum Profit)</h3>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">กำไรขั้นต่ำที่ต้องการ (บาท)</label>
+                        <input type="number" id="minProfitInput" placeholder="เช่น: 5" class="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm">
+                    </div>
+                </div>
+
+                <!-- 2. Sorting Priority -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800 mb-2 border-l-4 border-blue-500 pl-2">2. การจัดลำดับความสำคัญ (Sorting Priority)</h3>
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 space-y-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">อันดับที่ 1 (สำคัญสุด)</label>
+                            <select id="prio1" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none text-sm">
+                                <option value="sell">ราคาขายถูกที่สุด</option>
+                                <option value="profit">ราคาทุนถูกที่สุด / กำไรสูงสุด</option>
+                                <option value="aggregator">ค่ายที่ชอบ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">อันดับที่ 2</label>
+                            <select id="prio2" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none text-sm">
+                                <option value="profit">ราคาทุนถูกที่สุด / กำไรสูงสุด</option>
+                                <option value="sell">ราคาขายถูกที่สุด</option>
+                                <option value="aggregator">ค่ายที่ชอบ</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">อันดับที่ 3</label>
+                            <select id="prio3" class="w-full p-2.5 border border-slate-300 rounded-lg outline-none text-sm">
+                                <option value="aggregator">ค่ายที่ชอบ</option>
+                                <option value="profit">ราคาทุนถูกที่สุด / กำไรสูงสุด</option>
+                                <option value="sell">ราคาขายถูกที่สุด</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Tie-Breaker Lists (Click to order) -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-sm font-bold text-slate-800 border-l-4 border-purple-500 pl-2">3. ลำดับค่าย (Aggregator Priority)</h3>
+                        <button onclick="clearPrefs('aggregator')" class="text-xs text-red-500 hover:text-red-700 font-medium"><i class="fa-solid fa-rotate-left mr-1"></i>รีเซ็ต</button>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <p class="text-[11px] text-slate-500 mb-2 font-medium">กดเลือกชื่อค่ายเพื่อจัดลำดับ (1 = สำคัญสุด)</p>
+                        <div id="aggPrefContainer" class="flex flex-wrap gap-2 min-h-[32px]"></div>
+                    </div>
+                </div>
+                
+                <!-- 4. Carrier Priority (Click to order) -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-sm font-bold text-slate-800 border-l-4 border-orange-500 pl-2">4. ลำดับขนส่ง (Carrier Priority)</h3>
+                        <button onclick="clearPrefs('carrier')" class="text-xs text-red-500 hover:text-red-700 font-medium"><i class="fa-solid fa-rotate-left mr-1"></i>รีเซ็ต</button>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <p class="text-[11px] text-slate-500 mb-2 font-medium">กดเลือกชื่อขนส่งเพื่อจัดลำดับ (1 = สำคัญสุด)</p>
+                        <div id="carrierPrefContainer" class="flex flex-wrap gap-2 min-h-[32px]"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex justify-end gap-3">
+                <button onclick="closeSettings()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors">ยกเลิก</button>
+                <button onclick="saveSettings()" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-lg transition-colors">บันทึกและใช้ทันที</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Upload Modal -->
+    <div id="uploadModal" class="fixed inset-0 bg-slate-900/80 z-40 hidden items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 text-center">
+            <i class="fa-solid fa-file-excel text-5xl text-green-500 mb-4"></i>
+            <h2 class="text-xl font-bold mb-2">อัปโหลดไฟล์ Master Data</h2>
+            <p class="text-slate-500 text-sm mb-6">กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มต้นใช้งานระบบ</p>
+            
+            <label class="cursor-pointer flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 rounded-xl hover:bg-slate-50 hover:border-blue-500 transition-colors">
+                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2"></i>
+                    <p class="text-sm text-slate-500"><span class="font-semibold">คลิกเพื่อเลือกไฟล์</span> หรือลากไฟล์มาวาง</p>
+                </div>
+                <input type="file" id="excelUpload" accept=".xlsx, .xls" class="hidden" onchange="handleFileUpload(event)" />
+            </label>
+        </div>
+    </div>
+
+    <!-- Mobile Overlay -->
+    <div id="mobileOverlay" class="fixed inset-0 bg-slate-900/50 z-40 hidden backdrop-blur-sm md:hidden" onclick="toggleMobileSidebar(true)"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="bg-slate-900 text-white w-64 flex-shrink-0 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 z-50 flex flex-col shadow-2xl md:shadow-none">
+        <div class="h-16 flex items-center justify-center px-6 border-b border-slate-800">
+            <span class="mr-3 text-xl">✨</span>
+            <span class="font-bold text-lg tracking-wide">WuRu Logic</span>
+            <span class="ml-3 text-xl">✨</span>
+        </div>
+        
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto hide-scroll">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2">เมนูหลัก</p>
+            <a href="#" onclick="switchPage('single')" id="nav-single" class="nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors">
+                <i class="fa-solid fa-magnifying-glass w-6 text-center mr-2"></i> ตรวจสอบขนส่งเดียว
+            </a>
+            <a href="#" onclick="switchPage('compare')" id="nav-compare" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors">
+                <i class="fa-solid fa-scale-balanced w-6 text-center mr-2"></i> เปรียบเทียบทุกขนส่ง
+            </a>
+
+            <!-- Carrier Toggles (Compare Mode) -->
+            <div id="carrierFilterSection" class="mt-4 hidden">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2 flex justify-between items-center">
+                    เปิด/ปิด ขนส่ง
+                    <button onclick="toggleAllCarriers()" class="text-blue-400 hover:text-blue-300 text-[10px] underline">สลับทั้งหมด</button>
+                </p>
+                <div id="carrierFilterList" class="space-y-1 mt-2"></div>
+            </div>
+        </nav>
+
+        <div class="px-4 pb-4 flex flex-col">
+            <!-- Admin Settings -->
+            <div class="admin-only hidden mb-4" id="nav-settings-wrapper">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2">ตั้งค่าระบบ (Admin)</p>
+                <a href="#" onclick="openSettings()" class="nav-item flex items-center px-4 py-3 text-blue-400 hover:bg-slate-800 hover:text-blue-300 rounded-xl transition-colors">
+                    <i class="fa-solid fa-sliders w-6 text-center mr-2"></i> Logic Setting
+                </a>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800">
+                <button onclick="clearData()" class="w-full py-2 px-4 bg-slate-800 hover:bg-red-600/20 hover:text-red-400 text-slate-400 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> อัปเดตไฟล์ Excel ใหม่
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <!-- Strict Header UI -->
+        <header class="h-16 bg-white shadow-sm border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 z-10 flex-shrink-0">
+            <div class="flex items-center">
+                <button onclick="toggleMobileSidebar()" class="md:hidden mr-4 text-slate-500 hover:text-slate-700">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <h1 id="pageTitle" class="text-lg font-bold text-slate-800">ตรวจสอบขนส่งเดียว</h1>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <!-- Privacy Toggle (Admin Only) -->
+                <button id="btnPrivacyToggle" onclick="togglePrivacy()" class="hidden items-center justify-center w-10 h-10 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                    <i id="privacyIcon" class="fa-solid fa-eye-slash"></i>
+                </button>
+                
+                <!-- User Status & Logout -->
+                <div class="flex items-center gap-3 border-l pl-4 border-slate-200">
+                    <div class="text-right hidden sm:block">
+                        <p id="userRoleDisplay" class="text-sm font-bold text-slate-800">Staff Mode</p>
+                        <p class="text-xs text-green-500 flex items-center justify-end gap-1">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span> Online
+                        </p>
+                    </div>
+                    <button onclick="logout()" class="w-10 h-10 rounded-full bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Scrollable Form & Results -->
+        <div class="flex-1 overflow-y-auto p-4 lg:p-8 hide-scroll">
+            <div class="max-w-7xl mx-auto space-y-6">
+                
+                <!-- Input Form -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 lg:p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-bold text-slate-800 border-l-4 border-blue-500 pl-3">ข้อมูลพัสดุ</h2>
+                        <button onclick="resetForm()" class="text-sm text-slate-500 hover:text-red-500 transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-eraser"></i> ล้างค่า
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Carrier Select -->
+                        <div id="singleCarrierWrapper" class="col-span-1 md:col-span-2 lg:col-span-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">เลือกขนส่ง <span class="text-red-500">*</span></label>
+                            <select id="inputCarrier" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"></select>
+                        </div>
+
+                        <!-- Weight (Sync Inputs) -->
+                        <div class="col-span-1 md:col-span-1 lg:col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 mb-1.5">น้ำหนัก <span class="text-red-500">*</span></label>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1">
+                                    <input type="number" id="inputGram" placeholder="0" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="document.getElementById('inputKg').value = this.value ? (parseFloat(this.value)/1000).toFixed(2) : ''">
+                                    <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">g</span>
+                                </div>
+                                <div class="flex items-center text-slate-400 text-sm"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                                <div class="relative flex-1">
+                                    <input type="number" id="inputKg" placeholder="0.00" step="0.01" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="document.getElementById('inputGram').value = this.value ? (parseFloat(this.value)*1000) : ''">
+                                    <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">kg</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dimensions -->
+                        <div class="col-span-1 md:col-span-1 lg:col-span-2">
+                            <label class="flex items-center text-sm font-medium text-slate-700 mb-1.5">
+                                ขนาด (กxยxส) cm 
+                                <span id="dimError" class="text-red-600 font-bold text-xs ml-2 hidden">กรุณากรอกขนาด</span>
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="number" id="inputW" placeholder="กว้าง" class="w-1/3 p-2.5 text-sm border border-slate-300 rounded-xl text-center outline-none focus:border-blue-500">
+                                <input type="number" id="inputL" placeholder="ยาว" class="w-1/3 p-2.5 text-sm border border-slate-300 rounded-xl text-center outline-none focus:border-blue-500">
+                                <input type="number" id="inputH" placeholder="สูง" class="w-1/3 p-2.5 text-sm border border-slate-300 rounded-xl text-center outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Zone & Calculate Button -->
+                        <div class="col-span-1 md:col-span-2 lg:col-span-4">
+                            <div class="flex flex-col sm:flex-row gap-3 items-end">
+                                <!-- Zone -->
+                                <div class="flex-1 w-full bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1.5">ปลายทาง <span class="text-red-500">*</span></label>
+                                    <div class="flex gap-2">
+                                        <label class="flex-1 cursor-pointer">
+                                            <input type="radio" name="zone" value="BKK" class="peer hidden" checked>
+                                            <div class="text-center px-2 border border-slate-300 rounded-lg peer-checked:bg-blue-50 peer-checked:border-blue-500 peer-checked:text-blue-700 hover:bg-slate-100 transition-all text-sm font-medium leading-tight flex items-center justify-center h-[42px]">
+                                                <i class="fa-solid fa-city mr-1.5"></i> กทม/นนท์/ปทุม/ส.ปราการ
+                                            </div>
+                                        </label>
+                                        <label class="flex-1 cursor-pointer">
+                                            <input type="radio" name="zone" value="OTHER" class="peer hidden">
+                                            <div class="text-center px-2 border border-slate-300 rounded-lg peer-checked:bg-blue-50 peer-checked:border-blue-500 peer-checked:text-blue-700 hover:bg-slate-100 transition-all text-sm font-medium leading-tight flex items-center justify-center h-[42px]">
+                                                <i class="fa-solid fa-map-location-dot mr-1.5"></i> ต่างจังหวัด
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <!-- Calculate Button -->
+                                <div class="w-full sm:w-48 lg:w-64 flex-shrink-0 mt-2 sm:mt-0 sm:pb-3">
+                                    <button onclick="calculatePrice()" class="w-full h-[42px] bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 transform active:scale-95 text-sm">
+                                        <i class="fa-solid fa-calculator"></i> คำนวณราคา
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="resultSection" class="hidden space-y-6">
+                    
+                    <!-- Top Recommendations -->
+                    <div id="topRecommendations" class="hidden">
+                        <h2 id="topRecTitle" class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-crown text-yellow-500"></i> Top 3 แนะนำ</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="topCardsContainer"></div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 class="text-lg font-bold text-slate-800 border-l-4 border-blue-500 pl-3">ผลลัพธ์การเปรียบเทียบ</h2>
+                            <span id="resultCount" class="text-xs font-medium bg-blue-100 text-blue-700 px-3 py-1 rounded-full">พบ 0 รายการ</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left whitespace-nowrap">
+                                <thead>
+                                    <tr class="bg-slate-100 text-slate-600 text-sm font-semibold border-b border-slate-200">
+                                        <th class="py-4 px-6">อันดับ</th>
+                                        <th class="py-4 px-6">ขนส่ง</th>
+                                        <th class="py-4 px-6">ค่าย</th>
+                                        <th class="py-4 px-6">ประเภท</th>
+                                        <th class="py-4 px-6 text-right">ราคาขาย</th>
+                                        <th id="thCost" class="py-4 px-6 text-right hidden text-red-600">ต้นทุน</th>
+                                        <th id="thProfit" class="py-4 px-6 text-right hidden text-green-600">กำไร</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultTableBody" class="divide-y divide-slate-100 text-slate-700 text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Screen -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-white/90 z-[100] hidden items-center justify-center flex-col">
+        <div class="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+        <p class="text-lg font-semibold text-slate-700" id="loadingText">กำลังประมวลผลข้อมูล...</p>
+    </div>
+
+    <!-- ไฟล์ Config สำหรับ SECRETS (อย่าลืมลบส่วนนี้ออกหากย้ายไปไว้ที่ Head แล้ว) -->
+    <script src="config.js"></script>
+
+    <script>
+        /* =========================================================================
+           1. CORE LOGIC: SUPER NORMALIZER (Utility functions)
+           ========================================================================= */
+        function normalizeString(str) {
+            if (str == null || str === '') return '-';
+            let cleaned = String(str);
+            // แปลงสัญลักษณ์ขีด (Dash/Hyphen) ทุกประเภทสารพัดรูปแบบใน Excel ให้อยู่ในรูปแบบเดียว (-)
+            cleaned = cleaned.replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D_–—−]/g, '-');
+            // นำช่องว่างและอักขระที่มองไม่เห็นออกทั้งหมด
+            cleaned = cleaned.replace(/[\s\u200B-\u200D\uFEFF]/g, '');
+            // ทำตัวอักษรพิมพ์ใหญ่ทั้งหมดเพื่อการ Match แบบ Exact
+            cleaned = cleaned.toUpperCase();
+            
+            // แทนที่ค่าว่างเปล่าด้วย '-' (แต่ 'NO' จะคงไว้ตาม Business Logic ของ Vol_limit)
+            if (cleaned === 'UNDEFINED' || cleaned === 'NULL' || cleaned === 'NONE' || cleaned === 'NORMAL' || cleaned === '') return '-';
+            return cleaned; 
+        }
+
+        /* =========================================================================
+           2. STATE MANAGEMENT & AUTHENTICATION (UI State)
+           ========================================================================= */
+        const state = {
+            role: null, 
+            isCensored: true,
+            page: 'single', 
+            disabledCarriers: [], 
+            sortPriorities: ['sell', 'profit', 'aggregator'], 
+            aggregatorPrefs: [],
+            carrierPrefs: [],   
+            minProfit: 0        
+        };
+        
+        let windowLastCalculatedResults = [];
+        let tempAggPrefs = [];
+        let tempCarrierPrefs = [];
+        
+        // MASTER DATA STATE
+        window.parsedProfiles = [];
+        window.parsedAggs = {};
+        window.parsedSelling = {};
+        
+        let availableAggs = [];
+        let availableCarriers = [];
+        let isMockDataUploaded = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            checkMidnightReset();
+            
+            const savedRole = localStorage.getItem('smeUserRole');
+            if (savedRole) {
+                login(savedRole, true);
+            }
+
+            checkExistingData();
+            document.getElementById('adminPassword').addEventListener('keypress', e => { if (e.key === 'Enter') login('admin'); });
+        });
+
+        function login(role, isAutoLogin = false) { 
+            if (role === 'admin' && !isAutoLogin) { 
+                const inputPass = document.getElementById('adminPassword').value;
+                const hashedPass = CryptoJS.SHA256(inputPass).toString();
+                
+                // ตรวจสอบว่ามีตัวแปร SECRETS และ SECRETS.ADMIN_HASH อยู่จริงหรือไม่
+                if (typeof SECRETS === 'undefined' || !SECRETS.ADMIN_HASH) {
+                    alert("เข้าสู่ระบบไม่ได้: ไม่พบไฟล์ตั้งค่าความปลอดภัย (config.js)");
+                    return;
+                }
+                
+                // เทียบ Hash ที่ได้กับ SECRETS.ADMIN_HASH
+                if (hashedPass !== SECRETS.ADMIN_HASH) {
+                    alert("รหัสผ่านไม่ถูกต้อง"); 
+                    return; 
+                }
+            }
+            state.role = role;
+            state.isCensored = true; 
+            
+            localStorage.setItem('smeUserRole', role);
+
+            document.getElementById('loginModal').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('userRoleDisplay').innerText = role === 'admin' ? 'Admin Mode' : 'Staff Mode';
+            
+            const btnPrivacy = document.getElementById('btnPrivacyToggle');
+            const iconPrivacy = document.getElementById('privacyIcon');
+            if (role === 'admin') {
+                btnPrivacy.classList.remove('hidden'); btnPrivacy.classList.add('flex');
+                iconPrivacy.className = 'fa-solid fa-eye-slash';
+            } else {
+                btnPrivacy.classList.add('hidden'); btnPrivacy.classList.remove('flex');
+            }
+            
+            applyRoleUI();
+            if (isMockDataUploaded) populateCarriers();
+
+            if (windowLastCalculatedResults && windowLastCalculatedResults.length > 0) {
+                renderTableResults(windowLastCalculatedResults);
+            }
+        }
+
+        function logout() {
+            state.role = null; state.isCensored = true;
+            localStorage.removeItem('smeUserRole');
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('loginModal').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('resultSection').classList.add('hidden');
+            applyRoleUI(); 
+        }
+
+        function togglePrivacy() {
+            state.isCensored = !state.isCensored;
+            document.getElementById('privacyIcon').className = state.isCensored ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+            if (!document.getElementById('resultSection').classList.contains('hidden')) renderTableResults(windowLastCalculatedResults);
+        }
+
+        function applyRoleUI() {
+            document.querySelectorAll('.admin-only').forEach(el => {
+                if (state.role === 'admin') el.classList.remove('hidden'); else el.classList.add('hidden');
+            });
+            const navSet = document.getElementById('nav-settings-wrapper');
+            if (state.role === 'admin') navSet.classList.remove('hidden'); else navSet.classList.add('hidden');
+        }
+
+        /* =========================================================================
+           3. DATA PERSISTENCE & FILE UPLOAD (REAL EXCEL PARSING)
+           ========================================================================= */
+        function checkExistingData() {
+            if (loadPersistedData()) {
+                isMockDataUploaded = true;
+                if(state.role) populateCarriers(); 
+            } else { 
+                document.getElementById('uploadModal').classList.remove('hidden'); 
+                document.getElementById('uploadModal').classList.add('flex'); 
+            }
+        }
+
+        function loadPersistedData() {
+            if (localStorage.getItem('isMockDataUploaded') === 'true') {
+                try {
+                    window.parsedProfiles = JSON.parse(localStorage.getItem('parsedProfiles')) || [];
+                    window.parsedAggs = JSON.parse(localStorage.getItem('parsedAggs')) || {};
+                    window.parsedSelling = JSON.parse(localStorage.getItem('parsedSelling')) || {};
+                    availableAggs = JSON.parse(localStorage.getItem('availableAggs')) || [];
+                    availableCarriers = JSON.parse(localStorage.getItem('availableCarriers')) || [];
+                    return window.parsedProfiles.length > 0;
+                } catch(e) { return false; }
+            }
+            return false;
+        }
+
+        function clearData() {
+            if(confirm("ต้องการอัปโหลดไฟล์ Excel ใหม่หรือไม่? ข้อมูลเก่าจะถูกล้างทิ้งทั้งหมด")) { 
+                localStorage.removeItem('isMockDataUploaded');
+                localStorage.removeItem('parsedProfiles');
+                localStorage.removeItem('parsedAggs');
+                localStorage.removeItem('parsedSelling');
+                localStorage.removeItem('availableAggs');
+                localStorage.removeItem('availableCarriers');
+                location.reload(); 
+            }
+        }
+
+        function checkMidnightReset() {
+            const lastReset = localStorage.getItem('lastCarrierResetDate');
+            const today = new Date().toLocaleDateString();
+            if (lastReset !== today) { localStorage.removeItem('disabledCarriers'); localStorage.setItem('lastCarrierResetDate', today); }
+            const savedDisabled = localStorage.getItem('disabledCarriers');
+            if (savedDisabled) state.disabledCarriers = JSON.parse(savedDisabled);
+        }
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0]; 
+            if (!file) return;
+            
+            showLoading('กำลังประมวลผล Master Data...');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    
+                    window.parsedProfiles = [];
+                    window.parsedAggs = {};
+                    window.parsedSelling = {};
+                    
+                    let aggsSet = new Set();
+                    let carrierSet = new Set();
+                    
+                    // 1. อ่านและตรวจสอบ Profiles
+                    if (!workbook.SheetNames.includes('Profiles')) {
+                        throw new Error("ไม่พบแผ่นงาน 'Profiles' โปรดตรวจสอบไฟล์ Excel");
+                    }
+                    window.parsedProfiles = XLSX.utils.sheet_to_json(workbook.Sheets['Profiles'], { header: 1, defval: '' });
+                    
+                    // 2. แยกชิ้นส่วนแผ่นงาน Aggregators และ Selling
+                    workbook.SheetNames.forEach(sheetName => {
+                        const normName = normalizeString(sheetName);
+                        if (normName.startsWith('AGGREGATORS-')) {
+                            const aggName = normName.replace('AGGREGATORS-', '');
+                            window.parsedAggs[aggName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+                        } else if (normName.startsWith('SELLING-')) {
+                            window.parsedSelling[normName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
+                        }
+                    });
+                    
+                    // 3. กรองหาค่าที่มี Active = TRUE (คอลัมน์ O / Index 14)
+                    for (let i = 1; i < window.parsedProfiles.length; i++) {
+                        const row = window.parsedProfiles[i];
+                        if (!row || row.length < 15) continue; // ต้องมี A-O 
+                        
+                        const isActive = normalizeString(row[14]);
+                        if (isActive === 'TRUE') {
+                            aggsSet.add(normalizeString(row[0]));
+                            carrierSet.add(normalizeString(row[1]));
+                        }
+                    }
+                    
+                    availableAggs = Array.from(aggsSet).filter(x => x !== '-');
+                    availableCarriers = Array.from(carrierSet).filter(x => x !== '-');
+                    
+                    // 4. บันทึกข้อมูลแบบ Persistence
+                    try {
+                        localStorage.setItem('parsedProfiles', JSON.stringify(window.parsedProfiles));
+                        localStorage.setItem('parsedAggs', JSON.stringify(window.parsedAggs));
+                        localStorage.setItem('parsedSelling', JSON.stringify(window.parsedSelling));
+                        localStorage.setItem('availableAggs', JSON.stringify(availableAggs));
+                        localStorage.setItem('availableCarriers', JSON.stringify(availableCarriers));
+                        localStorage.setItem('isMockDataUploaded', 'true');
+                    } catch(storageError) {
+                        console.warn('Storage limit exceeded, cannot persist all data.');
+                    }
+                    
+                    isMockDataUploaded = true;
+                    document.getElementById('uploadModal').classList.add('hidden');
+                    populateCarriers();
+                    hideLoading();
+                } catch (err) {
+                    hideLoading();
+                    alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        /* =========================================================================
+           4. SETTINGS & LOGIC (CLICK-TO-ORDER)
+           ========================================================================= */
+        function updateAvailablePrefs() {}
+
+        function renderPrefList(type) {
+            const container = type === 'aggregator' ? document.getElementById('aggPrefContainer') : document.getElementById('carrierPrefContainer');
+            const availables = type === 'aggregator' ? availableAggs : availableCarriers;
+            const currentPrefs = type === 'aggregator' ? tempAggPrefs : tempCarrierPrefs;
+            
+            container.innerHTML = '';
+            
+            currentPrefs.forEach((item, index) => {
+                const isAgg = type === 'aggregator';
+                const colorClass = isAgg ? 'bg-purple-100 border-purple-300 text-purple-800' : 'bg-orange-100 border-orange-300 text-orange-800';
+                const badgeClass = isAgg ? 'bg-purple-600' : 'bg-orange-600';
+                
+                container.innerHTML += `
+                    <div onclick="togglePrefItem('${type}', '${item}')" class="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${colorClass} text-xs font-bold transition-all hover:opacity-80 shadow-sm select-none">
+                        <span class="flex items-center justify-center w-4 h-4 rounded-full ${badgeClass} text-white text-[10px]">${index + 1}</span>
+                        ${item}
+                    </div>
+                `;
+            });
+            
+            availables.forEach(item => {
+                if(!currentPrefs.includes(item)) {
+                    container.innerHTML += `
+                        <div onclick="togglePrefItem('${type}', '${item}')" class="cursor-pointer flex items-center px-3 py-1.5 rounded-full border border-slate-300 bg-white text-slate-500 text-xs font-medium hover:bg-slate-100 hover:text-slate-800 transition-all shadow-sm select-none">
+                            <i class="fa-solid fa-plus text-[10px] mr-1.5"></i>${item}
+                        </div>
+                    `;
+                }
+            });
+
+            if (availables.length === 0) {
+                 container.innerHTML = `<span class="text-xs text-slate-400 italic flex items-center w-full h-full">กรุณาอัปโหลดไฟล์ Master Data ก่อนเพื่อแสดงรายชื่อ</span>`;
+            }
+        }
+
+        function togglePrefItem(type, item) {
+            const prefs = type === 'aggregator' ? tempAggPrefs : tempCarrierPrefs;
+            const index = prefs.indexOf(item);
+            if (index > -1) {
+                prefs.splice(index, 1); 
+            } else {
+                prefs.push(item); 
+            }
+            renderPrefList(type);
+        }
+
+        function clearPrefs(type) {
+            if (type === 'aggregator') tempAggPrefs = [];
+            else tempCarrierPrefs = [];
+            renderPrefList(type);
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('smeDecisionSettings');
+            if (saved) {
+                try {
+                    const p = JSON.parse(saved);
+                    state.sortPriorities = p.sortPriorities || ['sell', 'profit', 'aggregator'];
+                    state.aggregatorPrefs = p.aggregatorPrefs || [];
+                    state.carrierPrefs = p.carrierPrefs || [];
+                    state.minProfit = parseFloat(p.minProfit) || 0;
+                } catch(e) {}
+            }
+        }
+
+        function openSettings() {
+            document.getElementById('prio1').value = state.sortPriorities[0];
+            document.getElementById('prio2').value = state.sortPriorities[1];
+            document.getElementById('prio3').value = state.sortPriorities[2];
+            
+            tempAggPrefs = [...state.aggregatorPrefs];
+            tempCarrierPrefs = [...state.carrierPrefs];
+            
+            updateAvailablePrefs();
+            renderPrefList('aggregator');
+            renderPrefList('carrier');
+
+            document.getElementById('minProfitInput').value = state.minProfit || '';
+            document.getElementById('settingsModal').classList.remove('hidden');
+            document.getElementById('settingsModal').classList.add('flex');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+            document.getElementById('settingsModal').classList.remove('flex');
+        }
+
+        function saveSettings() {
+            const p1 = document.getElementById('prio1').value, p2 = document.getElementById('prio2').value, p3 = document.getElementById('prio3').value;
+            if (new Set([p1, p2, p3]).size !== 3) { alert('กรุณาเลือกเกณฑ์การจัดลำดับไม่ให้ซ้ำกันครับ'); return; }
+            state.sortPriorities = [p1, p2, p3];
+            state.aggregatorPrefs = [...tempAggPrefs];
+            state.carrierPrefs = [...tempCarrierPrefs];
+            state.minProfit = parseFloat(document.getElementById('minProfitInput').value) || 0;
+            localStorage.setItem('smeDecisionSettings', JSON.stringify(state));
+            closeSettings();
+            
+            if (!document.getElementById('resultSection').classList.contains('hidden')) calculatePrice();
+        }
+
+        /* =========================================================================
+           5. UI CONTROLS (Toggles & Menus)
+           ========================================================================= */
+        function showLoading(txt) { document.getElementById('loadingText').innerText = txt; document.getElementById('loadingOverlay').classList.remove('hidden'); document.getElementById('loadingOverlay').classList.add('flex'); }
+        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); document.getElementById('loadingOverlay').classList.remove('flex'); }
+
+        function switchPage(page) {
+            state.page = page;
+            document.getElementById('nav-single').className = page === 'single' ? 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors' : 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
+            document.getElementById('nav-compare').className = page === 'compare' ? 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors' : 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
+            document.getElementById('pageTitle').innerText = page === 'single' ? 'ตรวจสอบขนส่งเดียว' : 'เปรียบเทียบทุกขนส่ง';
+            if (page === 'single') { document.getElementById('singleCarrierWrapper').classList.remove('hidden'); document.getElementById('carrierFilterSection').classList.add('hidden'); } 
+            else { document.getElementById('singleCarrierWrapper').classList.add('hidden'); document.getElementById('carrierFilterSection').classList.remove('hidden'); populateFilterList(); }
+            document.getElementById('resultSection').classList.add('hidden');
+            
+            const dimErrorEl = document.getElementById('dimError');
+            if(dimErrorEl) dimErrorEl.classList.add('hidden');
+            
+            toggleMobileSidebar(true);
+        }
+
+        function toggleMobileSidebar(forceHide = false) {
+            const sb = document.getElementById('sidebar'); 
+            const ov = document.getElementById('mobileOverlay');
+            
+            if (forceHide || !sb.classList.contains('-translate-x-full')) { 
+                sb.classList.add('-translate-x-full'); 
+                if (ov) ov.classList.add('hidden'); 
+            } else { 
+                sb.classList.remove('-translate-x-full'); 
+                if (ov) ov.classList.remove('hidden'); 
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('inputGram').value = ''; document.getElementById('inputKg').value = '';
+            document.getElementById('inputW').value = ''; document.getElementById('inputL').value = ''; document.getElementById('inputH').value = '';
+            document.querySelector('input[name="zone"][value="BKK"]').checked = true;
+            document.getElementById('resultSection').classList.add('hidden');
+            
+            const dimErrorEl = document.getElementById('dimError');
+            if(dimErrorEl) dimErrorEl.classList.add('hidden');
+        }
+
+        function populateCarriers() {
+            const sel = document.getElementById('inputCarrier');
+            const prevSelection = sel.value; 
+
+            sel.innerHTML = '<option value="">-- กรุณาเลือก --</option>';
+            availableCarriers.forEach(c => { if(c) sel.innerHTML += `<option value="${c}">${c}</option>`; });
+            
+            if (prevSelection && availableCarriers.includes(prevSelection)) {
+                sel.value = prevSelection;
+            } else if (availableCarriers.includes('THAIPOST')) {
+                sel.value = 'THAIPOST';
+            }
+            
+            populateFilterList();
+        }
+
+        function populateFilterList() {
+            const cont = document.getElementById('carrierFilterList'); cont.innerHTML = '';
+            availableCarriers.forEach(c => {
+                const checked = !state.disabledCarriers.includes(c);
+                cont.innerHTML += `<div class="flex items-center justify-between py-1 border-b border-slate-800 last:border-0"><span class="text-xs text-slate-300 truncate w-32 font-bold">${c}</span><div class="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in"><input type="checkbox" id="toggle_${c}" ${checked?'checked':''} onchange="toggleCarrier('${c}', this.checked)" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all z-10"/><label for="toggle_${c}" class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-500 cursor-pointer transition-colors"></label></div></div>`;
+            });
+        }
+
+        function toggleCarrier(k, checked) {
+            if (checked) state.disabledCarriers = state.disabledCarriers.filter(x => x !== k); else if(!state.disabledCarriers.includes(k)) state.disabledCarriers.push(k);
+            localStorage.setItem('disabledCarriers', JSON.stringify(state.disabledCarriers));
+        }
+
+        function toggleAllCarriers() {
+            const boxes = document.querySelectorAll('.toggle-checkbox');
+            const anyChecked = Array.from(boxes).some(cb => cb.checked);
+            boxes.forEach(cb => { cb.checked = !anyChecked; toggleCarrier(cb.id.replace('toggle_', ''), !anyChecked); });
+        }
+
+        /* =========================================================================
+           6. CORE CALCULATION ENGINE (Double Constraint Engine)
+           ========================================================================= */
+        function calculatePrice() {
+            const actualWeight = parseFloat(document.getElementById('inputKg').value);
+            const w = parseFloat(document.getElementById('inputW').value) || 0;
+            const l = parseFloat(document.getElementById('inputL').value) || 0;
+            const h = parseFloat(document.getElementById('inputH').value) || 0;
+            const zone = normalizeString(document.querySelector('input[name="zone"]:checked').value);
+            const singleCarrierRaw = document.getElementById('inputCarrier').value;
+            const singleCarrier = normalizeString(singleCarrierRaw);
+            const dimErrorEl = document.getElementById('dimError');
+
+            // --- UI Validations ---
+            if (dimErrorEl) dimErrorEl.classList.add('hidden');
+            if (isNaN(actualWeight) || actualWeight <= 0) { alert('กรุณากรอกน้ำหนักให้ถูกต้อง'); return; }
+            if (state.page === 'single' && (singleCarrier === '-' || singleCarrier === '')) { alert('กรุณาเลือกขนส่ง'); return; }
+            
+            const hasDims = w > 0 && l > 0 && h > 0;
+            
+            // บังคับกรอกขนาดหากเป็นโหมดเปรียบเทียบทุกขนส่ง
+            if (state.page === 'compare' && !hasDims) {
+                if (dimErrorEl) dimErrorEl.classList.remove('hidden');
+                return;
+            }
+            // อนุโลมสำหรับโหมดเดียว หากยังไม่ได้ระบุขนาดในบางขนส่งที่สามารถรันได้โดยไม่ต้องการ Size
+            if (state.page === 'single' && singleCarrier !== 'THAIPOST' && !hasDims) {
+                if (dimErrorEl) dimErrorEl.classList.remove('hidden');
+                return;
+            }
+
+            if (!window.parsedProfiles || window.parsedProfiles.length === 0) {
+                alert('ไม่พบข้อมูล Master Data กรุณาอัปโหลดไฟล์ Excel ก่อน');
+                return;
+            }
+
+            showLoading('กำลังคำนวณราคาทั้งระบบ...');
+
+            setTimeout(() => {
+                let finalResults = [];
+                
+                // คำนวณขนาดรวม และหาด้านที่ยาวที่สุด (cm) สำหรับตรวจสอบ Global Check
+                const sizeSum = w + l + h;
+                const maxSide = Math.max(w, l, h);
+                
+                // เริ่มลูปตรวจสอบโปรไฟล์ตามโครงสร้าง A-O (Index 0-14)
+                for (let i = 1; i < window.parsedProfiles.length; i++) {
+                    const p = window.parsedProfiles[i];
+                    if (!p || p.length < 15) continue; // ต้องมี 15 คอลัมน์ (A - O)
+                    
+                    const isActive = normalizeString(p[14]); // O: Is_active
+                    if (isActive !== 'TRUE') continue; // ข้ามถ้าระบุสถานะว่าไม่ได้ใช้งาน
+                    
+                    const agg = normalizeString(p[0]); // A
+                    const carrier = normalizeString(p[1]); // B
+                    const serviceType = normalizeString(p[2]); // C
+                    const costStyle = normalizeString(p[3]); // D
+                    
+                    const minWeightRaw = normalizeString(p[4]); // E
+                    const minWeightProfile = (minWeightRaw === 'NO' || minWeightRaw === '-') ? 0 : parseFloat(minWeightRaw);
+                    
+                    const maxSingleSide = parseFloat(p[5]) || Infinity; // F
+                    const maxTotalSize = parseFloat(p[6]) || Infinity; // G
+                    const volLimit1 = normalizeString(p[7]); // H
+                    const volDivisor1 = parseFloat(p[8]); // I
+                    const volLimit2 = normalizeString(p[9]); // J
+                    const volDivisor2 = parseFloat(p[10]); // K
+                    const sellingTab = normalizeString(p[11]); // L
+                    const sellingServiceType = normalizeString(p[12]); // M
+                    const sellingStyleType = normalizeString(p[13]); // N
+                    
+                    // ปฏิเสธโปรไฟล์ที่ไม่เกี่ยวข้องจาก UI Filter ทันที
+                    if (state.page === 'single' && carrier !== singleCarrier) continue;
+                    if (state.page === 'compare' && state.disabledCarriers.includes(carrier)) continue;
+                    
+                    // =====================================
+                    // 1. Profile & Global Dimension Check
+                    // =====================================
+                    if (actualWeight < minWeightProfile) continue; // Reject ทันทีถ้าน้ำหนักไม่ถึงเกณฑ์
+                    
+                    if (hasDims) {
+                        if (maxSide > maxSingleSide || sizeSum > maxTotalSize) continue; // Reject ทันทีหากตกเกณฑ์ขนาด
+                    }
+                    
+                    // =====================================
+                    // 4.1 Cost Engine
+                    // =====================================
+                    let chargeWeightCost = actualWeight;
+                    
+                    if (costStyle === 'DIVISOR' && hasDims) {
+                        // Sequential Divisor Check
+                        if (volLimit1 === 'NO' || volLimit1 === '-') {
+                            // สลับไปใช้ลอจิกน้ำหนักปกติ (Weight & Size (Sum))
+                            chargeWeightCost = actualWeight; 
+                        } else {
+                            const limit1 = parseFloat(volLimit1);
+                            if (actualWeight <= limit1) {
+                                chargeWeightCost = Math.max(actualWeight, (w * l * h) / volDivisor1);
+                            } else {
+                                if (volLimit2 === 'NO' || volLimit2 === '-') continue; // ทะลุเกณฑ์ 1 แต่ไม่มีเกณฑ์ 2 มารองรับ -> Reject
+                                const limit2 = parseFloat(volLimit2);
+                                if (actualWeight <= limit2) {
+                                    chargeWeightCost = Math.max(actualWeight, (w * l * h) / volDivisor2);
+                                } else {
+                                    continue; // ทะลุเกณฑ์ 2 -> Reject ทันที
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Precision ปัดเศษ
+                    chargeWeightCost = parseFloat(chargeWeightCost.toFixed(2));
+                    
+                    const aggSheet = window.parsedAggs[agg];
+                    if (!aggSheet) continue; // ไม่พบแผ่นงานต้นทุน -> Reject
+                    
+                    // 2.2 การระบุตำแหน่งขนส่ง (Mapping Header) ในบรรทัดที่ 2 (Row Index 1)
+                    const headerRow1 = aggSheet[1]; 
+                    if (!headerRow1) continue;
+                    
+                    let baseIndex = -1;
+                    for (let c = 0; c < headerRow1.length; c++) {
+                        if (normalizeString(headerRow1[c]) === carrier) {
+                            baseIndex = c;
+                            break;
+                        }
+                    }
+                    if (baseIndex === -1) continue; // หาขนส่งบนหัวตารางไม่พบ -> Reject
+                    
+                    let costPriceA = null; // ราคาจากน้ำหนัก
+                    let costPriceB = null; // ราคาจากขนาด
+
+                    // 2.3 Double Constraint Scanning ฝั่ง Cost (สแกนตั้งแต่บรรทัด 4 หรือ Row Index 3)
+                    for (let r = 3; r < aggSheet.length; r++) {
+                        const row = aggSheet[r];
+                        if (!row || row.length === 0) continue;
+                        
+                        const minW = parseFloat(row[0]);
+                        const maxW = parseFloat(row[1]);
+                        const z = normalizeString(row[2]);
+                        const rowCost = parseFloat(row[baseIndex]); // Base Index + 0
+                        let rowMaxSize = parseFloat(row[baseIndex + 1]); // Base Index + 1
+                        if (isNaN(rowMaxSize)) rowMaxSize = Infinity; 
+                        const rowService = normalizeString(row[baseIndex + 2]); // Base Index + 2
+                        
+                        // เช็ค Zone และ Service Type 
+                        if (z !== zone && z !== 'ALL') continue;
+                        if (rowService !== serviceType) continue; 
+                        if (isNaN(rowCost)) continue;
+
+                        // สแกนหา CostPrice_A (ราคาน้ำหนัก)
+                        if (costPriceA === null && !isNaN(minW) && !isNaN(maxW)) {
+                            // อนุโลมกรณี 0.01
+                            if ((chargeWeightCost > minW && chargeWeightCost <= maxW) || (minW === 0.01 && chargeWeightCost <= 0.01)) {
+                                costPriceA = rowCost;
+                            }
+                        }
+
+                        // สแกนหา CostPrice_B (ราคาขนาด)
+                        if (hasDims && costPriceB === null) {
+                            if (sizeSum <= rowMaxSize) {
+                                costPriceB = rowCost;
+                            }
+                        }
+
+                        // Optimization หยุดเมื่อเจอครบ
+                        if (costPriceA !== null && (!hasDims || costPriceB !== null)) break; 
+                    }
+                    
+                    // ปฏิเสธโปรไฟล์หากไม่ผ่านเงื่อนไขใดเงื่อนไขหนึ่ง
+                    if (costPriceA === null) continue; 
+                    if (hasDims && costPriceB === null) continue; 
+
+                    // หาราคาที่แพงที่สุดระหว่าง A และ B สำหรับใช้เป็นต้นทุน
+                    const finalCost = parseFloat((hasDims ? Math.max(costPriceA, costPriceB) : costPriceA).toFixed(2));
+                    
+                    // =====================================
+                    // 4.2 Sell Engine
+                    // =====================================
+                    let weightBasis = actualWeight;
+                    if (sellingStyleType === 'DIVISOR') {
+                        // ดึงน้ำหนัก ChargeWeight จาก Cost Engine มาสแกน
+                        weightBasis = chargeWeightCost; 
+                    }
+                    weightBasis = parseFloat(weightBasis.toFixed(2));
+                    
+                    // กำหนดเป้าหมาย (Sheet Lookup) 
+                    const sellSheetKey = normalizeString(sellingTab); 
+                    const sellSheet = window.parsedSelling[sellSheetKey];
+                    if (!sellSheet) continue; // ไม่พบ Sheet ราคาขาย -> Reject
+                    
+                    let sellPriceA = null; // ราคาขายจากน้ำหนัก
+                    let sellPriceB = null; // ราคาขายจากขนาด
+
+                    // Double Constraint Scanning ฝั่ง Sell (สแกนตั้งแต่บรรทัด 3 หรือ Row Index 2)
+                    for (let r = 2; r < sellSheet.length; r++) {
+                        const row = sellSheet[r];
+                        if (!row || row.length === 0) continue;
+                        
+                        const minW = parseFloat(row[0]);
+                        const maxW = parseFloat(row[1]);
+                        const z = normalizeString(row[2]);
+                        let rowMaxSize = parseFloat(row[3]);
+                        if (isNaN(rowMaxSize)) rowMaxSize = Infinity;
+                        const sellVal = parseFloat(row[4]);
+                        const rowService = normalizeString(row[5]);
+                        
+                        // เช็ค Zone และ Service Type 
+                        if (rowService !== sellingServiceType) continue;
+                        if (z !== zone && z !== 'ALL') continue;
+                        if (isNaN(sellVal)) continue;
+
+                        // สแกนหา SellPrice_A (ราคาน้ำหนัก)
+                        if (sellPriceA === null && !isNaN(minW) && !isNaN(maxW)) {
+                            if ((weightBasis > minW && weightBasis <= maxW) || (minW === 0.01 && weightBasis <= 0.01)) {
+                                sellPriceA = sellVal;
+                            }
+                        }
+
+                        // สแกนหา SellPrice_B (ราคาขนาด)
+                        if (hasDims && sellPriceB === null) {
+                            if (sizeSum <= rowMaxSize) {
+                                sellPriceB = sellVal;
+                            }
+                        }
+
+                        // Optimization หยุดเมื่อเจอครบ
+                        if (sellPriceA !== null && (!hasDims || sellPriceB !== null)) break;
+                    }
+                    
+                    // ปฏิเสธโปรไฟล์หากไม่ผ่านเงื่อนไขใดเงื่อนไขหนึ่ง
+                    if (sellPriceA === null) continue; 
+                    if (hasDims && sellPriceB === null) continue; 
+                    
+                    // หาราคาที่แพงที่สุดระหว่าง A และ B สำหรับแก้ปัญหาพัสดุน้ำหนักเบาแต่ Bulky
+                    const finalSell = parseFloat((hasDims ? Math.max(sellPriceA, sellPriceB) : sellPriceA).toFixed(2));
+                    
+                    // =====================================
+                    // 5. Profit Control & Finalization
+                    // =====================================
+                    const profit = parseFloat((finalSell - finalCost).toFixed(2));
+                    
+                    // หากกำไรไม่ได้ตามเป้าหมาย (Minimum Profit) ที่ Admin กำหนดให้คัดทิ้ง
+                    if (profit < state.minProfit) continue;
+                    
+                    finalResults.push({
+                        carrier: String(p[1]),         // ป้องกันการแปลงชื่อที่ผู้ใช้มองเห็น
+                        aggregator: String(p[0]), 
+                        serviceType: p[2] === '' ? '-' : String(p[2]),
+                        chargeWeight: chargeWeightCost,
+                        sell: finalSell,
+                        cost: finalCost,
+                        profit: profit,
+                        _normCarrier: carrier,         // สำหรับการจัดลำดับภายใน
+                        _normAgg: agg
+                    });
+                }
+                
+                // =====================================
+                // 4.3 Intelligent Sorting System
+                // =====================================
+                finalResults.sort((a, b) => {
+                    for (const prio of state.sortPriorities) {
+                        if (prio === 'sell') {
+                            if (a.sell !== b.sell) return a.sell - b.sell; // เรียงราคาขายจากน้อยไปมาก
+                        } else if (prio === 'profit') {
+                            if (a.profit !== b.profit) return b.profit - a.profit; // เรียงกำไรจากมากไปน้อย
+                        } else if (prio === 'aggregator') {
+                            const idxA = state.aggregatorPrefs.indexOf(a._normAgg);
+                            const idxB = state.aggregatorPrefs.indexOf(b._normAgg);
+                            const valA = idxA === -1 ? 999 : idxA;
+                            const valB = idxB === -1 ? 999 : idxB;
+                            if (valA !== valB) return valA - valB;
+                        }
+                    }
+                    
+                    // Tie-breaker ลำดับความสำคัญของบริษัทขนส่ง
+                    const cIdxA = state.carrierPrefs.indexOf(a._normCarrier);
+                    const cIdxB = state.carrierPrefs.indexOf(b._normCarrier);
+                    const cValA = cIdxA === -1 ? 999 : cIdxA;
+                    const cValB = cIdxB === -1 ? 999 : cIdxB;
+                    if (cValA !== cValB) return cValA - cValB;
+                    
+                    return 0; // คะแนนเท่ากันทุกประการ
+                });
+                
+                windowLastCalculatedResults = finalResults;
+                renderTableResults(finalResults);
+                hideLoading();
+            }, 100);
+        }
+
+        /* =========================================================================
+           7. RENDER RESULTS (UI RENDERER)
+           ========================================================================= */
+        function renderTableResults(results) {
+            document.getElementById('resultSection').classList.remove('hidden');
+            const tbody = document.getElementById('resultTableBody'); tbody.innerHTML = '';
+            document.getElementById('resultCount').innerText = `พบ ${results.length} รายการ`;
+
+            if (results.length === 0) {
+                document.getElementById('topRecommendations').classList.add('hidden');
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">ไม่พบขนส่งที่รองรับเงื่อนไขนี้ หรือ กำไรต่ำกว่าที่กำหนดไว้</td></tr>`;
+                return;
+            }
+
+            document.getElementById('topRecommendations').classList.remove('hidden');
+            const cards = document.getElementById('topCardsContainer'); cards.innerHTML = '';
+            
+            cards.className = state.page === 'single' ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 md:grid-cols-3 gap-4';
+            
+            const topRecTitle = document.getElementById('topRecTitle');
+            const cardLimit = state.page === 'single' ? 1 : 3;
+            if (topRecTitle) {
+                topRecTitle.innerHTML = state.page === 'single' 
+                    ? '<i class="fa-solid fa-crown text-yellow-500"></i> แนะนำอันดับ 1' 
+                    : '<i class="fa-solid fa-crown text-yellow-500"></i> Top 3 แนะนำ';
+            }
+
+            const thCost = document.getElementById('thCost');
+            const thProfit = document.getElementById('thProfit');
+            if (state.role === 'admin' && !state.isCensored) {
+                if (thCost) thCost.classList.remove('hidden');
+                if (thProfit) thProfit.classList.remove('hidden');
+            } else {
+                if (thCost) thCost.classList.add('hidden');
+                if (thProfit) thProfit.classList.add('hidden');
+            }
+            
+            const badgeStyles = [
+                'bg-amber-100 text-amber-700 border-amber-200',
+                'bg-slate-100 text-slate-600 border-slate-200',
+                'bg-orange-50 text-orange-600 border-orange-200'
+            ];
+            const badgeIcons = ['fa-crown', 'fa-medal', 'fa-thumbs-up'];
+            const badgeTexts = ['#1 Best Value', '#2 Recommended', '#3 Alternative'];
+            
+            for(let i=0; i < Math.min(cardLimit, results.length); i++) {
+                const r = results[i];
+                let pHTML = (state.role === 'admin' && !state.isCensored) 
+                    ? `<div class="text-right">
+                         <p class="text-[10px] text-slate-500 font-medium mb-1">กำไร</p>
+                         <p class="text-xl font-bold text-green-500 leading-none">฿${r.profit.toFixed(2)}</p>
+                       </div>` 
+                    : '';
+                
+                cards.innerHTML += `
+                <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${i === 0 ? 'from-amber-400 to-yellow-400' : (i === 1 ? 'from-slate-300 to-slate-400' : 'from-orange-400 to-orange-400')}"></div>
+                    <div class="flex justify-between items-start mb-5 mt-1">
+                        <h3 class="font-extrabold text-slate-800 text-2xl tracking-tight">${r.carrier}</h3>
+                        <div class="${badgeStyles[i]} border text-[11px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid ${badgeIcons[i]}"></i> ${badgeTexts[i]}
+                        </div>
+                    </div>
+                    <div class="space-y-2.5 mb-6">
+                        <div class="flex items-center text-sm">
+                            <div class="w-6 text-slate-400 flex justify-center"><i class="fa-solid fa-layer-group"></i></div>
+                            <span class="text-slate-500 w-16">ค่าย:</span>
+                            <span class="font-semibold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded text-xs ml-1">${r.aggregator}</span>
+                        </div>
+                        <div class="flex items-center text-sm">
+                            <div class="w-6 text-indigo-400 flex justify-center"><i class="fa-solid fa-box-open"></i></div>
+                            <span class="text-slate-500 w-16">ประเภท:</span>
+                            <span class="font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded text-xs ml-1">${r.serviceType}</span>
+                        </div>
+                    </div>
+                    <div class="w-full h-px bg-slate-100 mb-5 mt-auto"></div>
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <p class="text-xs text-slate-500 font-medium mb-1.5">ราคาขาย</p>
+                            <p class="text-3xl font-black text-blue-600 leading-none">฿${r.sell.toFixed(2)}</p>
+                        </div>
+                        ${pHTML}
+                    </div>
+                </div>`;
+            }
+
+            results.forEach((r, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = idx === 0 ? 'bg-green-50' : 'hover:bg-slate-50 transition-colors';
+                let cHTML = (state.role === 'admin' && !state.isCensored) ? `<td class="py-3 px-6 text-right font-medium text-red-500">฿${r.cost.toFixed(2)}</td><td class="py-3 px-6 text-right font-bold text-green-600">฿${r.profit.toFixed(2)}</td>` : '';
+                tr.innerHTML = `<td class="py-3 px-6">${idx === 0 ? `<span class="bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fa-solid fa-star text-[10px]"></i> Best</span>` : (idx + 1)}</td><td class="py-3 px-6 font-bold text-slate-800">${r.carrier}</td><td class="py-3 px-6 text-slate-500 text-sm">${r.aggregator}</td><td class="py-3 px-6 text-indigo-600 font-semibold text-sm bg-indigo-50 rounded px-2">${r.serviceType}</td><td class="py-3 px-6 text-right font-bold text-blue-600">฿${r.sell.toFixed(2)}</td>${cHTML}`;
+                tbody.appendChild(tr);
+            });
+            applyRoleUI();
+        }
+    </script>
+</body>
+</html>
