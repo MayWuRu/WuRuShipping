@@ -10,8 +10,13 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" type="image/png" href="icon.png">
-    <!-- โหลด config.js ก่อนสคริปต์ตัวอื่นๆ เพื่อเตรียมค่า SECRETS ให้พร้อมใช้งาน -->
-    <script src="config.js"></script>
+    
+    <!-- โหลด config.js แบบ Cache Busting เพื่อป้องกันเบราว์เซอร์จำไฟล์เก่า -->
+    <script>
+        const script = document.createElement('script');
+        script.src = 'config.js?v=' + new Date().getTime();
+        document.head.appendChild(script);
+    </script>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -445,12 +450,11 @@
 
         function login(role, isAutoLogin = false) { 
             if (role === 'admin' && !isAutoLogin) { 
-                // เพิ่ม console.log เช็คสถานะการโหลดไฟล์
                 console.log("Checking SECRETS:", window.SECRETS);
                 
-                // ตรวจสอบเงื่อนไขการเช็คให้รองรับการโหลดไฟล์ที่อาจจะช้าบน Server
-                if (typeof window.SECRETS === 'undefined' || !window.SECRETS.ADMIN_HASH) {
-                    alert("ระบบขัดข้อง: ไม่สามารถดึงข้อมูลจาก config.js ได้ กรุณารีเฟรชหน้าจอ (Ctrl+F5)");
+                // ตรวจสอบแบบ "รอการโหลด"
+                if (!(window.SECRETS && window.SECRETS.ADMIN_HASH)) {
+                    alert("ระบบกำลังโหลดข้อมูลความลับ กรุณารอ 2-3 วินาทีแล้วลองใหม่");
                     return;
                 }
                 
@@ -1204,6 +1208,13 @@
             });
             applyRoleUI();
         }
+    </script>
+    
+    <!-- Startup Check -->
+    <script>
+        window.addEventListener('load', () => {
+            console.log("System Ready. SECRETS state:", typeof window.SECRETS);
+        });
     </script>
 </body>
 </html>
