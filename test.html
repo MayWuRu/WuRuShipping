@@ -1205,13 +1205,13 @@
                     // 2. ดึงกำไรขั้นต่ำตามโซนที่ผู้ใช้งานระบุ
                     const applicableMinProfit = (zone === 'BKK') ? state.minProfitBKK : state.minProfitOther;
                     
-                    // 3. เปรียบเทียบเพื่อหาราคาขายสุดท้าย (Max Price) ระหว่าง 'ราคาทุน + กำไรขั้นต่ำตามโซน' และ 'ราคาขายจากตาราง'
-                    const finalSell = parseFloat(Math.max(tableSell, finalCost + applicableMinProfit).toFixed(2));
+                    // 3. ห้ามปรับปรุงราคาขาย: กำหนดให้ราคาขายเป็นราคาที่มาจากตาราง Selling เท่านั้น ห้ามนำกำไรไปบวกเพิ่ม
+                    const finalSell = tableSell;
                     
                     // 4. คำนวณกำไรที่แท้จริง
                     const profit = parseFloat((finalSell - finalCost).toFixed(2));
                     
-                    // (กันเหนียว) กรองข้อมูลทิ้งหากมีข้อผิดพลาดทศนิยมแล้วกำไรน้อยกว่าค่าที่ตั้งไว้
+                    // 5. ใช้กำไรขั้นต่ำเป็นตัวกรอง (Disqualification Filter) หากกำไรจริงน้อยกว่าค่าขั้นต่ำ ให้ทำการคัดโปรไฟล์นี้ทิ้ง
                     if (profit < applicableMinProfit) continue;
                     
                     // ==========================================
