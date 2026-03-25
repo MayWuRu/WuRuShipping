@@ -99,8 +99,16 @@
                 <div>
                     <h3 class="text-sm font-bold text-slate-800 mb-2 border-l-4 border-green-500 pl-2">1. กำหนดกำไรขั้นต่ำ (Minimum Profit)</h3>
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <label class="block text-sm font-semibold text-slate-700 mb-1">กำไรขั้นต่ำที่ต้องการ (บาท)</label>
-                        <input type="number" id="minProfitInput" placeholder="เช่น: 5" class="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">กำไรขั้นต่ำ BKK (บาท)</label>
+                                <input type="number" id="minProfitBKK" placeholder="เช่น: 5" class="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1">กำไรขั้นต่ำ Other (บาท)</label>
+                                <input type="number" id="minProfitOther" placeholder="เช่น: 5" class="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-sm">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -430,7 +438,8 @@
             sortPriorities: ['sell', 'profit', 'aggregator'], 
             aggregatorPrefs: [],
             carrierPrefs: [],   
-            minProfit: 0,
+            minProfitBKK: 0,
+            minProfitOther: 0,
             originalFile: null // เพิ่มไว้เก็บค่า Blob ของไฟล์ Master Data
         };
         
@@ -864,7 +873,8 @@
                     state.sortPriorities = p.sortPriorities || ['sell', 'profit', 'aggregator'];
                     state.aggregatorPrefs = p.aggregatorPrefs || [];
                     state.carrierPrefs = p.carrierPrefs || [];
-                    state.minProfit = parseFloat(p.minProfit) || 0;
+                    state.minProfitBKK = p.minProfitBKK !== undefined ? parseFloat(p.minProfitBKK) : (parseFloat(p.minProfit) || 0);
+                    state.minProfitOther = p.minProfitOther !== undefined ? parseFloat(p.minProfitOther) : (parseFloat(p.minProfit) || 0);
                 } catch(e) {}
             }
         }
@@ -881,7 +891,8 @@
             renderPrefList('aggregator');
             renderPrefList('carrier');
 
-            document.getElementById('minProfitInput').value = state.minProfit || '';
+            document.getElementById('minProfitBKK').value = state.minProfitBKK || '';
+            document.getElementById('minProfitOther').value = state.minProfitOther || '';
             document.getElementById('settingsModal').classList.remove('hidden');
             document.getElementById('settingsModal').classList.add('flex');
         }
@@ -897,7 +908,8 @@
             state.sortPriorities = [p1, p2, p3];
             state.aggregatorPrefs = [...tempAggPrefs];
             state.carrierPrefs = [...tempCarrierPrefs];
-            state.minProfit = parseFloat(document.getElementById('minProfitInput').value) || 0;
+            state.minProfitBKK = parseFloat(document.getElementById('minProfitBKK').value) || 0;
+            state.minProfitOther = parseFloat(document.getElementById('minProfitOther').value) || 0;
             localStorage.setItem('smeDecisionSettings', JSON.stringify(state));
             closeSettings();
             
@@ -1183,11 +1195,26 @@
                     if (sellPriceA === null) continue; 
                     if (hasDims && sellPriceB === null) continue; 
                     
-                    const finalSell = parseFloat((hasDims ? Math.max(sellPriceA, sellPriceB) : sellPriceA).toFixed(2));
+                    // ==========================================
+                    // ส่วนที่มีการอัปเกรด Logic การคำนวณกำไรขั้นต่ำ (Max Price)
+                    // ==========================================
                     
+                    // 1. คำนวณราคาขายพื้นฐานตามน้ำหนักหรือปริมาตร (จากตาราง Selling)
+                    const tableSell = parseFloat((hasDims ? Math.max(sellPriceA, sellPriceB) : sellPriceA).toFixed(2));
+                    
+                    // 2. ดึงกำไรขั้นต่ำตามโซนที่ผู้ใช้งานระบุ
+                    const applicableMinProfit = (zone === 'BKK') ? state.minProfitBKK : state.minProfitOther;
+                    
+                    // 3. ห้ามปรับปรุงราคาขาย: กำหนดให้ราคาขายเป็นราคาที่มาจากตาราง Selling เท่านั้น ห้ามนำกำไรไปบวกเพิ่ม
+                    const finalSell = tableSell;
+                    
+                    // 4. คำนวณกำไรที่แท้จริง
                     const profit = parseFloat((finalSell - finalCost).toFixed(2));
                     
-                    if (profit < state.minProfit) continue;
+                    // 5. ใช้กำไรขั้นต่ำเป็นตัวกรอง (Disqualification Filter) หากกำไรจริงน้อยกว่าค่าขั้นต่ำ ให้ทำการคัดโปรไฟล์นี้ทิ้ง
+                    if (profit < applicableMinProfit) continue;
+                    
+                    // ==========================================
                     
                     finalResults.push({
                         carrier: String(p[1]),         
