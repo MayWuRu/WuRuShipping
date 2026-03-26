@@ -312,12 +312,12 @@
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">น้ำหนัก <span class="text-red-500">*</span></label>
                             <div class="flex gap-2">
                                 <div class="relative flex-1">
-                                    <input type="number" id="inputGram" placeholder="0" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="document.getElementById('inputKg').value = this.value ? (parseFloat(this.value)/1000).toFixed(2) : ''">
+                                    <input type="number" id="inputGram" placeholder="0" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="syncWeight('gram', this.value)">
                                     <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">g</span>
                                 </div>
                                 <div class="flex items-center text-slate-400 text-sm"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
                                 <div class="relative flex-1">
-                                    <input type="number" id="inputKg" placeholder="0.00" step="0.01" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="document.getElementById('inputGram').value = this.value ? (parseFloat(this.value)*1000) : ''">
+                                    <input type="number" id="inputKg" placeholder="0.000" step="0.001" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="syncWeight('kg', this.value)">
                                     <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">kg</span>
                                 </div>
                             </div>
@@ -427,6 +427,25 @@
             return cleaned; 
         }
 
+        // เก็บไว้ใช้งานสำหรับส่วนที่ไม่ใช่น้ำหนัก เช่น ขนาด (กxยxส) หรือกำไร
+        const pRound = (num) => {
+            if (isNaN(num) || num === null || num === undefined) return NaN;
+            return Math.round((parseFloat(num) + Number.EPSILON) * 10000) / 10000;
+        };
+
+        // แสดงผลหน่วยกิโลกรัมเป็น ทศนิยม 3 ตำแหน่ง เสมอ
+        function syncWeight(source, value) {
+            if (source === 'gram') {
+                const kgInput = document.getElementById('inputKg');
+                if (!value) { kgInput.value = ''; return; }
+                kgInput.value = (parseFloat(value) / 1000).toFixed(3);
+            } else if (source === 'kg') {
+                const gramInput = document.getElementById('inputGram');
+                if (!value) { gramInput.value = ''; return; }
+                gramInput.value = Math.round(parseFloat(value) * 1000);
+            }
+        }
+
         /* =========================================================================
            2. STATE MANAGEMENT & AUTHENTICATION (UI State)
            ========================================================================= */
@@ -440,7 +459,7 @@
             carrierPrefs: [],   
             minProfitBKK: 0,
             minProfitOther: 0,
-            originalFile: null // เพิ่มไว้เก็บค่า Blob ของไฟล์ Master Data
+            originalFile: null
         };
         
         let windowLastCalculatedResults = [];
@@ -582,10 +601,8 @@
             
             showLoading('กำลังประมวลผล Master Data...');
             
-            // 1. เก็บรักษา Blob ต้นฉบับไว้ใน state สำหรับโหลดใน Session นี้
             state.originalFile = file;
 
-            // 2. แปลงเป็น Base64 เผื่อไว้ใช้เวลาโหลดหน้าเว็บใหม่ (LocalStorage)
             const base64Reader = new FileReader();
             base64Reader.onload = function(e) {
                 try {
@@ -596,7 +613,6 @@
             };
             base64Reader.readAsDataURL(file);
 
-            // 3. กระบวนการอ่านข้อมูลเข้าสู่ระบบ
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
@@ -613,6 +629,7 @@
                     if (!workbook.SheetNames.includes('Profiles')) {
                         throw new Error("ไม่พบแผ่นงาน 'Profiles' โปรดตรวจสอบไฟล์ Excel");
                     }
+                    
                     window.parsedProfiles = XLSX.utils.sheet_to_json(workbook.Sheets['Profiles'], { header: 1, defval: '' });
                     
                     workbook.SheetNames.forEach(sheetName => {
@@ -620,7 +637,8 @@
                         if (normName.startsWith('AGGREGATORS-')) {
                             const aggName = normName.replace('AGGREGATORS-', '');
                             window.parsedAggs[aggName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
-                        } else if (normName.startsWith('SELLING-')) {
+                        } 
+                        else if (normName.startsWith('SELLING-')) {
                             window.parsedSelling[normName] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '' });
                         }
                     });
@@ -631,8 +649,8 @@
                         
                         const isActive = normalizeString(row[14]);
                         if (isActive === 'TRUE') {
-                            aggsSet.add(normalizeString(row[0]));
-                            carrierSet.add(normalizeString(row[1]));
+                            aggsSet.add(normalizeString(row[0]));    
+                            carrierSet.add(normalizeString(row[1])); 
                         }
                     }
                     
@@ -665,21 +683,17 @@
         /* =========================================================================
            3.5 DATA PORTABILITY & EXPORT MODULE
            ========================================================================= */
-           
-        // ฟังก์ชันดาวน์โหลด Master Data คืน (Admin Only - Sidebar)
         function handleDownloadMasterData() {
             if (state.role !== 'admin') {
                 alert('การเข้าถึงถูกปฏิเสธ: ฟีเจอร์นี้สงวนไว้สำหรับ Admin เท่านั้น');
                 return;
             }
 
-            // ถ้ามี File Blob อยู่ใน Session ปัจจุบัน (เพิ่งอัปโหลด) ให้ดึงมาสร้าง URL เลย
             if (state.originalFile) {
                 triggerFileDownload(state.originalFile, 'Backup_MasterData.xlsx');
                 return;
             }
 
-            // ถ้ารีเฟรชไปแล้ว ให้พยายามกู้คืนจาก Base64 ใน LocalStorage
             const base64Data = localStorage.getItem('originalExcelFile');
             if (!base64Data) {
                 alert('ไม่พบไฟล์ต้นฉบับในระบบ (อาจเกินโควต้าพื้นที่เบราว์เซอร์) กรุณาอัปโหลดไฟล์ Master Data ใหม่อีกครั้งเพื่อทำการแบคอัป');
@@ -687,7 +701,6 @@
             }
 
             try {
-                // แปลง Base64 กลับเป็น Blob
                 const arr = base64Data.split(',');
                 const mime = arr[0].match(/:(.*?);/)[1];
                 const bstr = atob(arr[1]);
@@ -704,7 +717,6 @@
             }
         }
 
-        // ตัวช่วยดาวน์โหลดไฟล์
         function triggerFileDownload(blobOrFile, filename) {
             const url = window.URL.createObjectURL(blobOrFile);
             const a = document.createElement('a');
@@ -716,7 +728,6 @@
             window.URL.revokeObjectURL(url);
         }
 
-        // ฟังก์ชันดาวน์โหลดผลลัพธ์การคำนวณราคา (Role-Based - Main Content)
         function handleExportResults() {
             if (!windowLastCalculatedResults || windowLastCalculatedResults.length === 0) {
                 alert('ยังไม่มีข้อมูลผลลัพธ์ กรุณาคำนวณราคาขนส่งก่อนทำการส่งออก');
@@ -727,7 +738,6 @@
 
             setTimeout(() => {
                 try {
-                    // 1. ดึงข้อมูลพื้นฐานที่ใช้ค้นหา
                     const kg = document.getElementById('inputKg').value || '0';
                     const w = document.getElementById('inputW').value || '0';
                     const l = document.getElementById('inputL').value || '0';
@@ -735,28 +745,23 @@
                     const zoneElem = document.querySelector('input[name="zone"]:checked');
                     const zoneStr = zoneElem && zoneElem.value === 'BKK' ? 'กทม/นนท์/ปทุม/ส.ปราการ' : 'ต่างจังหวัด';
 
-                    // 2. จัดเตรียมโครงสร้าง Array of Arrays (AOA) สำหรับ SheetJS
                     const wsData = [];
                     
-                    // เพิ่ม Header พื้นฐาน
                     wsData.push(['รายงานการตรวจสอบและเปรียบเทียบราคาขนส่ง (WuRu Shipping)']);
                     wsData.push(['น้ำหนักที่คำนวณ:', `${kg} kg`]);
                     wsData.push(['ขนาดพัสดุ (ก x ย x ส):', `${w} x ${l} x ${h} cm`]);
                     wsData.push(['พื้นที่ปลายทาง:', zoneStr]);
                     wsData.push(['ผู้ตรวจสอบ (Role):', state.role === 'admin' ? 'Admin' : 'Staff']);
-                    wsData.push([]); // บรรทัดว่าง
+                    wsData.push([]); 
 
-                    // 3. กำหนดหัวตารางข้อมูลตามสิทธิ์
                     let headers = ['ลำดับ', 'ขนส่ง (Carrier)', 'ค่าย (Aggregator)', 'ประเภทบริการ', 'น้ำหนักคิดเงิน (Charge Weight)', 'ราคาขาย (Selling Price)'];
                     
-                    // [Security] ตรวจสอบสิทธิ์ Admin เพื่อเพิ่มคอลัมน์ Cost และ Profit
                     if (state.role === 'admin') {
                         headers.push('ต้นทุน (Cost)');
                         headers.push('กำไร (Profit)');
                     }
                     wsData.push(headers);
 
-                    // 4. บรรจุข้อมูล
                     windowLastCalculatedResults.forEach((r, idx) => {
                         let rowData = [
                             idx + 1,
@@ -767,7 +772,6 @@
                             r.sell
                         ];
                         
-                        // [Security] บรรจุข้อมูลต้นทุนเฉพาะแอดมิน
                         if (state.role === 'admin') {
                             rowData.push(r.cost);
                             rowData.push(r.profit);
@@ -775,27 +779,16 @@
                         wsData.push(rowData);
                     });
 
-                    // 5. สร้าง Worksheet และปรับความกว้างคอลัมน์
                     const worksheet = XLSX.utils.aoa_to_sheet(wsData);
                     worksheet['!cols'] = [
-                        {wch: 8},  // ลำดับ
-                        {wch: 25}, // ขนส่ง
-                        {wch: 25}, // ค่าย
-                        {wch: 18}, // ประเภท
-                        {wch: 25}, // น้ำหนักคิดเงิน
-                        {wch: 20}, // ราคาขาย
-                        {wch: 15}, // ต้นทุน
-                        {wch: 15}  // กำไร
+                        {wch: 8}, {wch: 25}, {wch: 25}, {wch: 18}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}
                     ];
 
-                    // 6. สร้าง Workbook และทำการดาวน์โหลด
                     const workbook = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(workbook, worksheet, "Calculation Results");
 
                     const now = new Date();
                     const timestamp = `${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-                    
-                    // ตั้งชื่อไฟล์ตามสิทธิ์เพื่อความชัดเจน
                     const filename = state.role === 'admin' ? `Admin_Pricing_Export_${timestamp}.xlsx` : `Staff_Pricing_Export_${timestamp}.xlsx`;
                     
                     XLSX.writeFile(workbook, filename);
@@ -805,7 +798,7 @@
                 } finally {
                     hideLoading();
                 }
-            }, 300); // ดีเลย์เล็กน้อยให้ UI หมุนโชว์
+            }, 300);
         }
 
         /* =========================================================================
@@ -996,11 +989,14 @@
         }
 
         /* =========================================================================
-           6. CORE CALCULATION ENGINE (Double Constraint Engine)
-           - DO NOT MODIFY CORE LOGIC AS REQUESTED -
+           6. CORE CALCULATION ENGINE (Double Constraint Engine - GRAM INTEGER LOGIC)
            ========================================================================= */
         function calculatePrice() {
-            const actualWeight = parseFloat(document.getElementById('inputKg').value);
+            // ดึงค่าจากช่อง Input กิโลกรัม เป็นหลัก 
+            const inpKg = document.getElementById('inputKg').value;
+            // THE ABSOLUTE ZERO-GAP FIX: แปลงน้ำหนักที่กรอกเป็นจำนวนเต็ม "กรัม" ทันที เพื่อกำจัด Floating Point Error 100%
+            const inputWeightGrams = Math.round(parseFloat(inpKg) * 1000);
+            
             const w = parseFloat(document.getElementById('inputW').value) || 0;
             const l = parseFloat(document.getElementById('inputL').value) || 0;
             const h = parseFloat(document.getElementById('inputH').value) || 0;
@@ -1010,10 +1006,12 @@
             const dimErrorEl = document.getElementById('dimError');
 
             if (dimErrorEl) dimErrorEl.classList.add('hidden');
-            if (isNaN(actualWeight) || actualWeight <= 0) { alert('กรุณากรอกน้ำหนักให้ถูกต้อง'); return; }
+            if (isNaN(inputWeightGrams) || inputWeightGrams <= 0) { alert('กรุณากรอกน้ำหนักให้ถูกต้อง'); return; }
             if (state.page === 'single' && (singleCarrier === '-' || singleCarrier === '')) { alert('กรุณาเลือกขนส่ง'); return; }
             
             const hasDims = w > 0 && l > 0 && h > 0;
+            const maxSide = Math.max(w, l, h);
+            const sizeSum = w + l + h;
             
             if (state.page === 'compare' && !hasDims) {
                 if (dimErrorEl) dimErrorEl.classList.remove('hidden');
@@ -1034,67 +1032,82 @@
             setTimeout(() => {
                 let finalResults = [];
                 
-                const sizeSum = w + l + h;
-                const maxSide = Math.max(w, l, h);
-                
                 for (let i = 1; i < window.parsedProfiles.length; i++) {
                     const p = window.parsedProfiles[i];
                     if (!p || p.length < 15) continue; 
                     
-                    const isActive = normalizeString(p[14]); 
-                    if (isActive !== 'TRUE') continue; 
+                    const agg = normalizeString(p[0]);                   // A: Aggregator
+                    const carrier = normalizeString(p[1]);               // B: Carrier
+                    const costServiceType = normalizeString(p[2]);       // C: Service_type
+                    const costStyleType = normalizeString(p[3]);         // D: Cost_Style_Type
+                    const minWeightRaw = normalizeString(p[4]);          // E: Min_weight
+                    const maxSingleSideRaw = normalizeString(p[5]);      // F: Max_single_side
+                    const maxTotalSizeRaw = normalizeString(p[6]);       // G: Max_total_size
+                    const volLimit1Raw = normalizeString(p[7]);          // H: Vol_limit_1
+                    const volDivisor1Raw = parseFloat(p[8]);             // I: Vol_divisor_1
+                    const volLimit2Raw = normalizeString(p[9]);          // J: Vol_limit_2
+                    const volDivisor2Raw = parseFloat(p[10]);            // K: Vol_divisor_2
+                    const sellingTab = normalizeString(p[11]);           // L: Selling_Tab
+                    const sellingServiceType = normalizeString(p[12]);   // M: Selling_Service_type
+                    const sellingStyleType = normalizeString(p[13]);     // N: Selling_Style_Type
+                    const isActive = normalizeString(p[14]);             // O: Is_active
                     
-                    const agg = normalizeString(p[0]); 
-                    const carrier = normalizeString(p[1]); 
-                    const serviceType = normalizeString(p[2]); 
-                    const costStyle = normalizeString(p[3]); 
-                    
-                    const minWeightRaw = normalizeString(p[4]); 
-                    const minWeightProfile = (minWeightRaw === 'NO' || minWeightRaw === '-') ? 0 : parseFloat(minWeightRaw);
-                    
-                    const maxSingleSide = parseFloat(p[5]) || Infinity; 
-                    const maxTotalSize = parseFloat(p[6]) || Infinity; 
-                    const volLimit1 = normalizeString(p[7]); 
-                    const volDivisor1 = parseFloat(p[8]); 
-                    const volLimit2 = normalizeString(p[9]); 
-                    const volDivisor2 = parseFloat(p[10]); 
-                    const sellingTab = normalizeString(p[11]); 
-                    const sellingServiceType = normalizeString(p[12]); 
-                    const sellingStyleType = normalizeString(p[13]); 
+                    if (isActive !== 'TRUE') continue; // Reject หากสถานะไม่ใช่ TRUE
                     
                     if (state.page === 'single' && carrier !== singleCarrier) continue;
                     if (state.page === 'compare' && state.disabledCarriers.includes(carrier)) continue;
                     
-                    if (actualWeight < minWeightProfile) continue; 
+                    // 1. Profile Check - ตรวจสอบน้ำหนักขั้นต่ำ (ใช้ Integer Logic)
+                    // สมมติฐานว่าในหน้า Profile หากระบุเป็น Kg จะคูณ 1000 เพื่อเป็นกรัมเสมอ
+                    const minWeightProfile = (minWeightRaw === 'NO' || minWeightRaw === '-') ? 0 : parseFloat(minWeightRaw);
+                    const minWeightProfileInGrams = Math.round(minWeightProfile * 1000); 
+                    if (inputWeightGrams < minWeightProfileInGrams) continue; 
                     
                     if (hasDims) {
-                        if (maxSide > maxSingleSide || sizeSum > maxTotalSize) continue; 
+                        const maxSingleSide = (maxSingleSideRaw === 'NO' || maxSingleSideRaw === '-' || maxSingleSideRaw === '') ? Infinity : pRound(parseFloat(maxSingleSideRaw));
+                        const maxTotalSize = (maxTotalSizeRaw === 'NO' || maxTotalSizeRaw === '-' || maxTotalSizeRaw === '') ? Infinity : pRound(parseFloat(maxTotalSizeRaw));
+                        
+                        // Reject ขนาดพัสดุ
+                        if (pRound(maxSide) > maxSingleSide || pRound(sizeSum) > maxTotalSize) continue; 
                     }
                     
-                    let chargeWeightCost = actualWeight;
+                    // ==========================================
+                    // 4.1 Cost Engine (ฝั่งต้นทุน)
+                    // ==========================================
                     
-                    if (costStyle === 'DIVISOR' && hasDims) {
-                        if (volLimit1 === 'NO' || volLimit1 === '-') {
-                            chargeWeightCost = actualWeight; 
-                        } else {
-                            const limit1 = parseFloat(volLimit1);
-                            if (actualWeight <= limit1) {
-                                chargeWeightCost = Math.max(actualWeight, (w * l * h) / volDivisor1);
+                    // คำนวณ Charge Weight (น้ำหนักคิดเงิน) ในรูปแบบ กรัม เป็นหลัก
+                    let chargeWeightCostInGrams = inputWeightGrams;
+                    
+                    if (costStyleType === 'DIVISOR' && hasDims) {
+                        if (volLimit1Raw !== 'NO' && volLimit1Raw !== '-' && volLimit1Raw !== '') {
+                            const limit1InGrams = Math.round(parseFloat(volLimit1Raw) * 1000);
+                            
+                            if (inputWeightGrams <= limit1InGrams) {
+                                // คำนวณปริมาตร (W*L*H)/Divisor ผลลัพธ์เป็น Kg แปลงกลับเป็น กรัม ด้วยการคูณ 1000 ทันที
+                                const volWKg = (w * l * h) / volDivisor1Raw;
+                                const volWGrams = Math.round(volWKg * 1000);
+                                chargeWeightCostInGrams = Math.max(inputWeightGrams, volWGrams);
                             } else {
-                                if (volLimit2 === 'NO' || volLimit2 === '-') continue; 
-                                const limit2 = parseFloat(volLimit2);
-                                if (actualWeight <= limit2) {
-                                    chargeWeightCost = Math.max(actualWeight, (w * l * h) / volDivisor2);
+                                if (volLimit2Raw !== 'NO' && volLimit2Raw !== '-' && volLimit2Raw !== '') {
+                                    const limit2InGrams = Math.round(parseFloat(volLimit2Raw) * 1000);
+                                    if (inputWeightGrams <= limit2InGrams) {
+                                        const volWKg = (w * l * h) / volDivisor2Raw;
+                                        const volWGrams = Math.round(volWKg * 1000);
+                                        chargeWeightCostInGrams = Math.max(inputWeightGrams, volWGrams);
+                                    } else {
+                                        // RESILIENT FALLBACK: น้ำหนักพ้นขีดจำกัด vol_limit ห้าม Reject ให้สลับใช้น้ำหนักจริง (หน่วยกรัม) ทันที
+                                        chargeWeightCostInGrams = inputWeightGrams; 
+                                    }
                                 } else {
-                                    continue; 
+                                    // RESILIENT FALLBACK
+                                    chargeWeightCostInGrams = inputWeightGrams; 
                                 }
                             }
                         }
                     }
                     
-                    chargeWeightCost = parseFloat(chargeWeightCost.toFixed(2));
-                    
-                    const aggSheet = window.parsedAggs[agg];
+                    const aggSheetKey = agg;
+                    const aggSheet = window.parsedAggs[aggSheetKey];
                     if (!aggSheet) continue; 
                     
                     const headerRow1 = aggSheet[1]; 
@@ -1116,26 +1129,30 @@
                         const row = aggSheet[r];
                         if (!row || row.length === 0) continue;
                         
-                        const minW = parseFloat(row[0]);
-                        const maxW = parseFloat(row[1]);
                         const z = normalizeString(row[2]);
-                        const rowCost = parseFloat(row[baseIndex]); 
-                        let rowMaxSize = parseFloat(row[baseIndex + 1]); 
-                        if (isNaN(rowMaxSize)) rowMaxSize = Infinity; 
+                        const rowCost = parseFloat(row[baseIndex + 0]); 
+                        const safeRowMaxSize = pRound(parseFloat(row[baseIndex + 1]) || Infinity); 
                         const rowService = normalizeString(row[baseIndex + 2]); 
                         
-                        if (z !== zone && z !== 'ALL') continue;
-                        if (rowService !== serviceType) continue; 
+                        if (z !== zone && z !== 'ALL') continue; 
+                        if (rowService !== costServiceType) continue; 
                         if (isNaN(rowCost)) continue;
 
-                        if (costPriceA === null && !isNaN(minW) && !isNaN(maxW)) {
-                            if ((chargeWeightCost > minW && chargeWeightCost <= maxW) || (minW === 0.01 && chargeWeightCost <= 0.01)) {
+                        // THE ABSOLUTE ZERO-GAP FIX: ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000) ปัดให้ชัวร์ว่าเป็นจำนวนเต็ม
+                        const minInGrams = Math.round(parseFloat(row[0]));
+                        const maxInGrams = Math.round(parseFloat(row[1]));
+
+                        // สแกนหาราคาที่ 1: เปรียบเทียบจำนวนเต็ม 100% ไม่มีเศษทศนิยมมากวนใจ
+                        if (costPriceA === null && !isNaN(minInGrams) && !isNaN(maxInGrams)) {
+                            // (เงื่อนไขเสริม <= 10 รองรับเผื่อกรณีไฟล์เก่ามี <= 0.01 kg ให้เท่ากับ <= 10 กรัม)
+                            if ((chargeWeightCostInGrams > minInGrams && chargeWeightCostInGrams <= maxInGrams) || (minInGrams <= 10 && chargeWeightCostInGrams <= 10)) {
                                 costPriceA = rowCost;
                             }
                         }
 
+                        // สแกนหาราคาที่ 2: ขนาดรวมกล่อง
                         if (hasDims && costPriceB === null) {
-                            if (sizeSum <= rowMaxSize) {
+                            if (pRound(sizeSum) <= safeRowMaxSize) {
                                 costPriceB = rowCost;
                             }
                         }
@@ -1143,18 +1160,23 @@
                         if (costPriceA !== null && (!hasDims || costPriceB !== null)) break; 
                     }
                     
+                    // SAFE LOOKUP: ตารางราคาต้นทุนไม่มีแถวที่รองรับน้ำหนัก/ขนาดนี้ ถึงจะ Reject
                     if (costPriceA === null) continue; 
-                    if (hasDims && costPriceB === null) continue; 
+                    if (hasDims && costPriceB === null) continue;
 
-                    const finalCost = parseFloat((hasDims ? Math.max(costPriceA, costPriceB) : costPriceA).toFixed(2));
+                    const finalCost = hasDims ? Math.max(costPriceA, costPriceB) : costPriceA;
                     
-                    let weightBasis = actualWeight;
+                    // ==========================================
+                    // 4.2 Sell Engine (ฝั่งขาย)
+                    // ==========================================
+                    
+                    let sellWeightBaseInGrams = inputWeightGrams;
+                    
                     if (sellingStyleType === 'DIVISOR') {
-                        weightBasis = chargeWeightCost; 
+                        sellWeightBaseInGrams = chargeWeightCostInGrams;
                     }
-                    weightBasis = parseFloat(weightBasis.toFixed(2));
-                    
-                    const sellSheetKey = normalizeString(sellingTab); 
+
+                    const sellSheetKey = sellingTab; 
                     const sellSheet = window.parsedSelling[sellSheetKey];
                     if (!sellSheet) continue; 
                     
@@ -1165,26 +1187,27 @@
                         const row = sellSheet[r];
                         if (!row || row.length === 0) continue;
                         
-                        const minW = parseFloat(row[0]);
-                        const maxW = parseFloat(row[1]);
                         const z = normalizeString(row[2]);
-                        let rowMaxSize = parseFloat(row[3]);
-                        if (isNaN(rowMaxSize)) rowMaxSize = Infinity;
+                        const sRowMaxSize = pRound(parseFloat(row[3]) || Infinity);
                         const sellVal = parseFloat(row[4]);
                         const rowService = normalizeString(row[5]);
                         
                         if (rowService !== sellingServiceType) continue;
-                        if (z !== zone && z !== 'ALL') continue;
+                        if (z !== zone && z !== 'ALL') continue; 
                         if (isNaN(sellVal)) continue;
 
-                        if (sellPriceA === null && !isNaN(minW) && !isNaN(maxW)) {
-                            if ((weightBasis > minW && weightBasis <= maxW) || (minW === 0.01 && weightBasis <= 0.01)) {
+                        // THE ABSOLUTE ZERO-GAP FIX: ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000)
+                        const sMinInGrams = Math.round(parseFloat(row[0]));
+                        const sMaxInGrams = Math.round(parseFloat(row[1]));
+
+                        if (sellPriceA === null && !isNaN(sMinInGrams) && !isNaN(sMaxInGrams)) {
+                            if ((sellWeightBaseInGrams > sMinInGrams && sellWeightBaseInGrams <= sMaxInGrams) || (sMinInGrams <= 10 && sellWeightBaseInGrams <= 10)) {
                                 sellPriceA = sellVal;
                             }
                         }
 
                         if (hasDims && sellPriceB === null) {
-                            if (sizeSum <= rowMaxSize) {
+                            if (pRound(sizeSum) <= sRowMaxSize) {
                                 sellPriceB = sellVal;
                             }
                         }
@@ -1192,38 +1215,30 @@
                         if (sellPriceA !== null && (!hasDims || sellPriceB !== null)) break;
                     }
                     
+                    // SAFE LOOKUP: ตารางราคาขายไม่มีแถวที่รองรับน้ำหนัก/ขนาดนี้ ถึงจะ Reject
                     if (sellPriceA === null) continue; 
                     if (hasDims && sellPriceB === null) continue; 
                     
+                    const finalSell = hasDims ? Math.max(sellPriceA, sellPriceB) : sellPriceA;
+                    
                     // ==========================================
-                    // ส่วนที่มีการอัปเกรด Logic การคำนวณกำไรขั้นต่ำ (Max Price)
+                    // สรุปผลกำไรขั้นต่ำและการผลักออก (Result Push)
                     // ==========================================
                     
-                    // 1. คำนวณราคาขายพื้นฐานตามน้ำหนักหรือปริมาตร (จากตาราง Selling)
-                    const tableSell = parseFloat((hasDims ? Math.max(sellPriceA, sellPriceB) : sellPriceA).toFixed(2));
-                    
-                    // 2. ดึงกำไรขั้นต่ำตามโซนที่ผู้ใช้งานระบุ
+                    const profit = finalSell - finalCost;
                     const applicableMinProfit = (zone === 'BKK') ? state.minProfitBKK : state.minProfitOther;
                     
-                    // 3. ห้ามปรับปรุงราคาขาย: กำหนดให้ราคาขายเป็นราคาที่มาจากตาราง Selling เท่านั้น ห้ามนำกำไรไปบวกเพิ่ม
-                    const finalSell = tableSell;
-                    
-                    // 4. คำนวณกำไรที่แท้จริง
-                    const profit = parseFloat((finalSell - finalCost).toFixed(2));
-                    
-                    // 5. ใช้กำไรขั้นต่ำเป็นตัวกรอง (Disqualification Filter) หากกำไรจริงน้อยกว่าค่าขั้นต่ำ ให้ทำการคัดโปรไฟล์นี้ทิ้ง
-                    if (profit < applicableMinProfit) continue;
-                    
-                    // ==========================================
+                    if (pRound(profit) < pRound(applicableMinProfit)) continue;
                     
                     finalResults.push({
                         carrier: String(p[1]),         
                         aggregator: String(p[0]), 
                         serviceType: p[2] === '' ? '-' : String(p[2]),
-                        chargeWeight: chargeWeightCost,
-                        sell: finalSell,
-                        cost: finalCost,
-                        profit: profit,
+                        // แปลง ChargeWeight กลับเป็น Kg (ทศนิยม 3 ตำแหน่ง) เพื่อแสดงผลในตาราง
+                        chargeWeight: parseFloat((chargeWeightCostInGrams / 1000).toFixed(3)), 
+                        sell: parseFloat(finalSell.toFixed(2)),
+                        cost: parseFloat(finalCost.toFixed(2)),
+                        profit: parseFloat(profit.toFixed(2)),
                         _normCarrier: carrier,         
                         _normAgg: agg
                     });
