@@ -994,7 +994,7 @@
         function calculatePrice() {
             // ดึงค่าจากช่อง Input กิโลกรัม เป็นหลัก 
             const inpKg = document.getElementById('inputKg').value;
-            // THE ABSOLUTE ZERO-GAP FIX: แปลงน้ำหนักที่กรอกเป็นจำนวนเต็ม "กรัม" ทันที เพื่อกำจัด Floating Point Error 100%
+            // แปลงน้ำหนักที่กรอกเป็นจำนวนเต็ม "กรัม" ทันที เพื่อกำจัด Floating Point Error 100%
             const inputWeightGrams = Math.round(parseFloat(inpKg) * 1000);
             
             const w = parseFloat(document.getElementById('inputW').value) || 0;
@@ -1138,14 +1138,13 @@
                         if (rowService !== costServiceType) continue; 
                         if (isNaN(rowCost)) continue;
 
-                        // THE ABSOLUTE ZERO-GAP FIX: ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000) ปัดให้ชัวร์ว่าเป็นจำนวนเต็ม
+                        // ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000) ปัดให้ชัวร์ว่าเป็นจำนวนเต็ม
                         const minInGrams = Math.round(parseFloat(row[0]));
                         const maxInGrams = Math.round(parseFloat(row[1]));
 
-                        // สแกนหาราคาที่ 1: เปรียบเทียบจำนวนเต็ม 100% ไม่มีเศษทศนิยมมากวนใจ
+                        // INCLUSIVE COMPARISON: เปลี่ยนจาก > เป็น >= เพื่อรองรับน้ำหนักที่ตกขอบ 1001 กรัมพอดี
                         if (costPriceA === null && !isNaN(minInGrams) && !isNaN(maxInGrams)) {
-                            // (เงื่อนไขเสริม <= 10 รองรับเผื่อกรณีไฟล์เก่ามี <= 0.01 kg ให้เท่ากับ <= 10 กรัม)
-                            if ((chargeWeightCostInGrams > minInGrams && chargeWeightCostInGrams <= maxInGrams) || (minInGrams <= 10 && chargeWeightCostInGrams <= 10)) {
+                            if ((chargeWeightCostInGrams >= minInGrams && chargeWeightCostInGrams <= maxInGrams) || (minInGrams <= 10 && chargeWeightCostInGrams <= 10)) {
                                 costPriceA = rowCost;
                             }
                         }
@@ -1196,12 +1195,13 @@
                         if (z !== zone && z !== 'ALL') continue; 
                         if (isNaN(sellVal)) continue;
 
-                        // THE ABSOLUTE ZERO-GAP FIX: ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000)
+                        // ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000)
                         const sMinInGrams = Math.round(parseFloat(row[0]));
                         const sMaxInGrams = Math.round(parseFloat(row[1]));
 
+                        // INCLUSIVE COMPARISON: เปลี่ยนจาก > เป็น >= เพื่อรองรับน้ำหนักที่ตกขอบ 1001 กรัมพอดี
                         if (sellPriceA === null && !isNaN(sMinInGrams) && !isNaN(sMaxInGrams)) {
-                            if ((sellWeightBaseInGrams > sMinInGrams && sellWeightBaseInGrams <= sMaxInGrams) || (sMinInGrams <= 10 && sellWeightBaseInGrams <= 10)) {
+                            if ((sellWeightBaseInGrams >= sMinInGrams && sellWeightBaseInGrams <= sMaxInGrams) || (sMinInGrams <= 10 && sellWeightBaseInGrams <= 10)) {
                                 sellPriceA = sellVal;
                             }
                         }
