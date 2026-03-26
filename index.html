@@ -307,7 +307,7 @@
                             <select id="inputCarrier" class="w-full p-2.5 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"></select>
                         </div>
 
-                        <!-- Weight (Sync Inputs) - PRECISION FIX APPLIED -->
+                        <!-- Weight (Sync Inputs) -->
                         <div class="col-span-1 md:col-span-1 lg:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">น้ำหนัก <span class="text-red-500">*</span></label>
                             <div class="flex gap-2">
@@ -317,6 +317,7 @@
                                 </div>
                                 <div class="flex items-center text-slate-400 text-sm"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
                                 <div class="relative flex-1">
+                                    <!-- UI UPDATE: ปรับเป็น 2 ตำแหน่ง เพื่อความสวยงาม (step 0.01) -->
                                     <input type="number" id="inputKg" placeholder="0.00" step="0.01" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="syncWeight('kg', this.value)">
                                     <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">kg</span>
                                 </div>
@@ -427,27 +428,18 @@
             return cleaned; 
         }
 
-        // ULTRA-HIGH PRECISION: Helper สำหรับปัดเศษทศนิยม 4 ตำแหน่งด้วย Exponential Notation ปิดช่องว่าง Floating Point Error ระดับอะตอม
-        function pRound(val) {
-            if (isNaN(val) || val === null || val === undefined) return NaN;
-            return Number(Math.round(parseFloat(val) + 'e4') + 'e-4');
-        }
+        // เก็บไว้ใช้งานสำหรับส่วนที่ไม่ใช่น้ำหนัก เช่น ขนาด (กxยxส) หรือกำไร
+        const pRound = (num) => {
+            if (isNaN(num) || num === null || num === undefined) return NaN;
+            return Math.round((parseFloat(num) + Number.EPSILON) * 10000) / 10000;
+        };
 
-        // ULTRA-HIGH PRECISION: ฟังก์ชันซิงค์น้ำหนัก (กิโลกรัม <=> กรัม) 
+        // UI UPDATE: แสดงผลหน่วยกิโลกรัมเป็น ทศนิยม 2 ตำแหน่ง เพื่อความสะอาดตา
         function syncWeight(source, value) {
             if (source === 'gram') {
                 const kgInput = document.getElementById('inputKg');
                 if (!value) { kgInput.value = ''; return; }
-                
-                // ซ่อนทศนิยมตำแหน่งที่ 3 (ไม่ปัดเศษ) เพื่อให้แสดง 2 หลักพอ (เช่น 999g = 0.99kg)
-                const kgStr = (parseFloat(value) / 1000).toString();
-                const decimalIndex = kgStr.indexOf('.');
-                let truncatedKg = kgStr;
-                if (decimalIndex !== -1) {
-                    truncatedKg = kgStr.substring(0, decimalIndex + 3);
-                }
-                kgInput.value = parseFloat(truncatedKg).toFixed(2);
-                
+                kgInput.value = (parseFloat(value) / 1000).toFixed(2); // ปรับเป็น 2 ตำแหน่ง
             } else if (source === 'kg') {
                 const gramInput = document.getElementById('inputGram');
                 if (!value) { gramInput.value = ''; return; }
@@ -998,12 +990,15 @@
         }
 
         /* =========================================================================
-           6. CORE CALCULATION ENGINE (Double Constraint Engine)
+           6. CORE CALCULATION ENGINE (Double Constraint Engine - GRAM INTEGER LOGIC)
            ========================================================================= */
         function calculatePrice() {
-            // ดึงค่า gram มาใช้เป็นหลักในการคำนวณ เพื่อรักษามูลค่าที่แท้จริง (เช่น 0.999) ไว้แม้หน้าจอ kg จะโชว์แค่ 0.99
+            // ดึงค่าจากช่อง Input กรัม เป็นหลัก เพื่อรักษาความแม่นยำระดับ 1 กรัม (xx001) แม้หน้าจอ Kg จะโชว์แค่ 2 ตำแหน่ง
             const gramInputVal = document.getElementById('inputGram').value;
-            const actualWeightRaw = gramInputVal ? (parseFloat(gramInputVal) / 1000) : parseFloat(document.getElementById('inputKg').value);
+            const kgInputVal = document.getElementById('inputKg').value;
+            
+            // แปลงน้ำหนักที่กรอกเป็นจำนวนเต็ม "กรัม" ทันที เพื่อกำจัด Floating Point Error 100%
+            const inputWeightGrams = gramInputVal ? Math.round(parseFloat(gramInputVal)) : Math.round(parseFloat(kgInputVal) * 1000);
             
             const w = parseFloat(document.getElementById('inputW').value) || 0;
             const l = parseFloat(document.getElementById('inputL').value) || 0;
@@ -1014,12 +1009,12 @@
             const dimErrorEl = document.getElementById('dimError');
 
             if (dimErrorEl) dimErrorEl.classList.add('hidden');
-            if (isNaN(actualWeightRaw) || actualWeightRaw <= 0) { alert('กรุณากรอกน้ำหนักให้ถูกต้อง'); return; }
+            if (isNaN(inputWeightGrams) || inputWeightGrams <= 0) { alert('กรุณากรอกน้ำหนักให้ถูกต้อง'); return; }
             if (state.page === 'single' && (singleCarrier === '-' || singleCarrier === '')) { alert('กรุณาเลือกขนส่ง'); return; }
             
-            // ULTRA-HIGH PRECISION: ปัดเศษน้ำหนักจริงด้วย pRound เพื่อปิดรอยรั่วทศนิยมตั้งแต่วินาทีแรก
-            const actualWeight = pRound(actualWeightRaw);
             const hasDims = w > 0 && l > 0 && h > 0;
+            const maxSide = Math.max(w, l, h);
+            const sizeSum = w + l + h;
             
             if (state.page === 'compare' && !hasDims) {
                 if (dimErrorEl) dimErrorEl.classList.remove('hidden');
@@ -1039,9 +1034,6 @@
 
             setTimeout(() => {
                 let finalResults = [];
-                
-                const sizeSum = w + l + h;
-                const maxSide = Math.max(w, l, h);
                 
                 for (let i = 1; i < window.parsedProfiles.length; i++) {
                     const p = window.parsedProfiles[i];
@@ -1068,50 +1060,50 @@
                     if (state.page === 'single' && carrier !== singleCarrier) continue;
                     if (state.page === 'compare' && state.disabledCarriers.includes(carrier)) continue;
                     
-                    // 1. Profile & Global Dimension Check (ครอบ pRound ป้องกันเศษทศนิยมตรงเกณฑ์ขั้นต่ำ)
-                    const minWeightProfile = (minWeightRaw === 'NO' || minWeightRaw === '-') ? 0 : pRound(parseFloat(minWeightRaw));
-                    if (actualWeight < minWeightProfile) continue; // Reject: น้ำหนักไม่ถึงเกณฑ์ขั้นต่ำ
+                    // 1. Profile Check - ตรวจสอบน้ำหนักขั้นต่ำ (ใช้ Integer Logic)
+                    // สมมติฐานว่าในหน้า Profile หากระบุเป็น Kg จะคูณ 1000 เพื่อเป็นกรัมเสมอ
+                    const minWeightProfile = (minWeightRaw === 'NO' || minWeightRaw === '-') ? 0 : parseFloat(minWeightRaw);
+                    const minWeightProfileInGrams = Math.round(minWeightProfile * 1000); 
+                    if (inputWeightGrams < minWeightProfileInGrams) continue; 
                     
                     if (hasDims) {
-                        const maxSingleSide = (maxSingleSideRaw === 'NO' || maxSingleSideRaw === '-' || maxSingleSideRaw === '') ? Infinity : parseFloat(maxSingleSideRaw);
-                        const maxTotalSize = (maxTotalSizeRaw === 'NO' || maxTotalSizeRaw === '-' || maxTotalSizeRaw === '') ? Infinity : parseFloat(maxTotalSizeRaw);
+                        const maxSingleSide = (maxSingleSideRaw === 'NO' || maxSingleSideRaw === '-' || maxSingleSideRaw === '') ? Infinity : pRound(parseFloat(maxSingleSideRaw));
+                        const maxTotalSize = (maxTotalSizeRaw === 'NO' || maxTotalSizeRaw === '-' || maxTotalSizeRaw === '') ? Infinity : pRound(parseFloat(maxTotalSizeRaw));
                         
-                        // Reject: ตกเกณฑ์ด้านยาวที่สุด หรือ ตกเกณฑ์ขนาดรวมของขนส่งเจ้านั้น (ข้อจำกัดทางกายภาพ)
-                        if (maxSide > maxSingleSide || sizeSum > maxTotalSize) continue; 
+                        // Reject ขนาดพัสดุ
+                        if (pRound(maxSide) > maxSingleSide || pRound(sizeSum) > maxTotalSize) continue; 
                     }
                     
                     // ==========================================
                     // 4.1 Cost Engine (ฝั่งต้นทุน)
                     // ==========================================
                     
-                    // คำนวณ Charge Weight (น้ำหนักคิดเงิน)
-                    let chargeWeightCost = actualWeight;
+                    // คำนวณ Charge Weight (น้ำหนักคิดเงิน) ในรูปแบบ กรัม เป็นหลัก
+                    let chargeWeightCostInGrams = inputWeightGrams;
                     
                     if (costStyleType === 'DIVISOR' && hasDims) {
-                        if (volLimit1Raw === 'NO' || volLimit1Raw === '-' || volLimit1Raw === '') {
-                            // VOLUMETRIC RESILIENCE: ไม่ระบุ Limit ให้ถือว่าใช้น้ำหนักจริงเสมอ
-                            chargeWeightCost = actualWeight; 
-                        } else {
-                            const limit1 = parseFloat(volLimit1Raw);
-                            if (actualWeight <= limit1) {
-                                // อยู่ในลิมิต 1 ใช้ตัวหาร 1
-                                const volW = (w * l * h) / volDivisor1Raw;
-                                chargeWeightCost = Math.max(actualWeight, volW);
+                        if (volLimit1Raw !== 'NO' && volLimit1Raw !== '-' && volLimit1Raw !== '') {
+                            const limit1InGrams = Math.round(parseFloat(volLimit1Raw) * 1000);
+                            
+                            if (inputWeightGrams <= limit1InGrams) {
+                                // คำนวณปริมาตร (W*L*H)/Divisor ผลลัพธ์เป็น Kg แปลงกลับเป็น กรัม ด้วยการคูณ 1000 ทันที
+                                const volWKg = (w * l * h) / volDivisor1Raw;
+                                const volWGrams = Math.round(volWKg * 1000);
+                                chargeWeightCostInGrams = Math.max(inputWeightGrams, volWGrams);
                             } else {
-                                // น้ำหนักจริงเกิน Limit 1
-                                if (volLimit2Raw === 'NO' || volLimit2Raw === '-' || volLimit2Raw === '') {
-                                    // VOLUMETRIC RESILIENCE: น้ำหนักทะลุ Tier 1 แต่ไม่มี Tier 2 ห้าม Reject! ให้กลับไปใช้น้ำหนักจริง
-                                    chargeWeightCost = actualWeight;
-                                } else {
-                                    const limit2 = parseFloat(volLimit2Raw);
-                                    if (actualWeight <= limit2) {
-                                        // อยู่ในลิมิต 2 ใช้ตัวหาร 2
-                                        const volW = (w * l * h) / volDivisor2Raw;
-                                        chargeWeightCost = Math.max(actualWeight, volW);
+                                if (volLimit2Raw !== 'NO' && volLimit2Raw !== '-' && volLimit2Raw !== '') {
+                                    const limit2InGrams = Math.round(parseFloat(volLimit2Raw) * 1000);
+                                    if (inputWeightGrams <= limit2InGrams) {
+                                        const volWKg = (w * l * h) / volDivisor2Raw;
+                                        const volWGrams = Math.round(volWKg * 1000);
+                                        chargeWeightCostInGrams = Math.max(inputWeightGrams, volWGrams);
                                     } else {
-                                        // VOLUMETRIC RESILIENCE: ทะลุ Tier 2 ห้าม Reject! ให้กลับไปใช้น้ำหนักจริง
-                                        chargeWeightCost = actualWeight;
+                                        // RESILIENT FALLBACK: น้ำหนักพ้นขีดจำกัด vol_limit ห้าม Reject ให้สลับใช้น้ำหนักจริง (หน่วยกรัม) ทันที
+                                        chargeWeightCostInGrams = inputWeightGrams; 
                                     }
+                                } else {
+                                    // RESILIENT FALLBACK
+                                    chargeWeightCostInGrams = inputWeightGrams; 
                                 }
                             }
                         }
@@ -1136,38 +1128,33 @@
                     let costPriceA = null; 
                     let costPriceB = null; 
 
-                    // ULTRA-HIGH PRECISION: ปัดเศษ Charge Weight ให้เหลือ 4 ตำแหน่งด้วย pRound() ก่อนนำไปกางตารางเทียบ
-                    const safeChargeWeight = pRound(chargeWeightCost);
-
                     for (let r = 3; r < aggSheet.length; r++) {
                         const row = aggSheet[r];
                         if (!row || row.length === 0) continue;
                         
                         const z = normalizeString(row[2]);
                         const rowCost = parseFloat(row[baseIndex + 0]); 
-                        let rowMaxSize = parseFloat(row[baseIndex + 1]); 
-                        if (isNaN(rowMaxSize)) rowMaxSize = Infinity; 
+                        const safeRowMaxSize = pRound(parseFloat(row[baseIndex + 1]) || Infinity); 
                         const rowService = normalizeString(row[baseIndex + 2]); 
                         
                         if (z !== zone && z !== 'ALL') continue; 
                         if (rowService !== costServiceType) continue; 
                         if (isNaN(rowCost)) continue;
 
-                        // ULTRA-HIGH PRECISION: ใช้ pRound() กับค่า Min/Max จาก Excel เสมอ
-                        const minW = pRound(parseFloat(row[0]));
-                        const maxW = pRound(parseFloat(row[1]));
+                        // ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000) ปัดให้ชัวร์ว่าเป็นจำนวนเต็ม
+                        const minInGrams = Math.round(parseFloat(row[0]));
+                        const maxInGrams = Math.round(parseFloat(row[1]));
 
-                        // สแกนหาราคาที่ 1: เช็คจากเกณฑ์น้ำหนัก (CostPrice_A) โดยครอบ pRound ทั้งสองฝั่ง
-                        if (costPriceA === null && !isNaN(minW) && !isNaN(maxW)) {
-                            // ปิดช่องว่าง 1.010000000001
-                            if ((pRound(safeChargeWeight) > minW && pRound(safeChargeWeight) <= maxW) || (minW <= 0.01 && pRound(safeChargeWeight) <= 0.01)) {
+                        // INCLUSIVE COMPARISON: >= และ <= เพื่อให้รอยต่อเป๊ะ 100%
+                        if (costPriceA === null && !isNaN(minInGrams) && !isNaN(maxInGrams)) {
+                            if ((chargeWeightCostInGrams >= minInGrams && chargeWeightCostInGrams <= maxInGrams) || (minInGrams <= 10 && chargeWeightCostInGrams <= 10)) {
                                 costPriceA = rowCost;
                             }
                         }
 
-                        // สแกนหาราคาที่ 2: เช็คจากเกณฑ์ขนาด (CostPrice_B)
+                        // สแกนหาราคาที่ 2: ขนาดรวมกล่อง
                         if (hasDims && costPriceB === null) {
-                            if (sizeSum <= rowMaxSize) {
+                            if (pRound(sizeSum) <= safeRowMaxSize) {
                                 costPriceB = rowCost;
                             }
                         }
@@ -1175,7 +1162,7 @@
                         if (costPriceA !== null && (!hasDims || costPriceB !== null)) break; 
                     }
                     
-                    // SAFE DISQUALIFICATION: หากตารางต้นทุนไม่มีเรตราคานี้จริงๆ ค่อย Reject แบบข้ามโปรไฟล์ไปเงียบๆ
+                    // SAFE LOOKUP: ตารางราคาต้นทุนไม่มีแถวที่รองรับน้ำหนัก/ขนาดนี้ ถึงจะ Reject
                     if (costPriceA === null) continue; 
                     if (hasDims && costPriceB === null) continue;
 
@@ -1185,13 +1172,11 @@
                     // 4.2 Sell Engine (ฝั่งขาย)
                     // ==========================================
                     
-                    let sellWeightBase = actualWeight;
-                    if (sellingStyleType === 'DIVISOR') {
-                        sellWeightBase = chargeWeightCost; 
-                    }
+                    let sellWeightBaseInGrams = inputWeightGrams;
                     
-                    // ULTRA-HIGH PRECISION: ป้องกันปัญหาการปัดเศษฝั่งราคาขายด้วย pRound()
-                    const safeSellWeight = pRound(sellWeightBase);
+                    if (sellingStyleType === 'DIVISOR') {
+                        sellWeightBaseInGrams = chargeWeightCostInGrams;
+                    }
 
                     const sellSheetKey = sellingTab; 
                     const sellSheet = window.parsedSelling[sellSheetKey];
@@ -1205,8 +1190,7 @@
                         if (!row || row.length === 0) continue;
                         
                         const z = normalizeString(row[2]);
-                        let rowMaxSize = parseFloat(row[3]);
-                        if (isNaN(rowMaxSize)) rowMaxSize = Infinity;
+                        const sRowMaxSize = pRound(parseFloat(row[3]) || Infinity);
                         const sellVal = parseFloat(row[4]);
                         const rowService = normalizeString(row[5]);
                         
@@ -1214,19 +1198,19 @@
                         if (z !== zone && z !== 'ALL') continue; 
                         if (isNaN(sellVal)) continue;
 
-                        // ULTRA-HIGH PRECISION: ใช้ pRound() กับค่า Min/Max ฝั่งราคาขายด้วย
-                        const minW = pRound(parseFloat(row[0]));
-                        const maxW = pRound(parseFloat(row[1]));
+                        // ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000)
+                        const sMinInGrams = Math.round(parseFloat(row[0]));
+                        const sMaxInGrams = Math.round(parseFloat(row[1]));
 
-                        // ใช้ pRound() ครอบการเปรียบเทียบทั้งหมดเพื่อปิด Floating Point Error ให้สนิท
-                        if (sellPriceA === null && !isNaN(minW) && !isNaN(maxW)) {
-                            if ((pRound(safeSellWeight) > minW && pRound(safeSellWeight) <= maxW) || (minW <= 0.01 && pRound(safeSellWeight) <= 0.01)) {
+                        // INCLUSIVE COMPARISON: >= และ <= เพื่อให้รอยต่อเป๊ะ 100%
+                        if (sellPriceA === null && !isNaN(sMinInGrams) && !isNaN(sMaxInGrams)) {
+                            if ((sellWeightBaseInGrams >= sMinInGrams && sellWeightBaseInGrams <= sMaxInGrams) || (sMinInGrams <= 10 && sellWeightBaseInGrams <= 10)) {
                                 sellPriceA = sellVal;
                             }
                         }
 
                         if (hasDims && sellPriceB === null) {
-                            if (sizeSum <= rowMaxSize) {
+                            if (pRound(sizeSum) <= sRowMaxSize) {
                                 sellPriceB = sellVal;
                             }
                         }
@@ -1234,7 +1218,7 @@
                         if (sellPriceA !== null && (!hasDims || sellPriceB !== null)) break;
                     }
                     
-                    // SAFE DISQUALIFICATION: หากตารางราคาขายไม่มีเรตราคานี้ ค่อย Reject อย่างปลอดภัย
+                    // SAFE LOOKUP: ตารางราคาขายไม่มีแถวที่รองรับน้ำหนัก/ขนาดนี้ ถึงจะ Reject
                     if (sellPriceA === null) continue; 
                     if (hasDims && sellPriceB === null) continue; 
                     
@@ -1247,14 +1231,14 @@
                     const profit = finalSell - finalCost;
                     const applicableMinProfit = (zone === 'BKK') ? state.minProfitBKK : state.minProfitOther;
                     
-                    // PROFIT FILTER PRECISION: ครอบ pRound ป้องกันเคส 4.999999 < 5.00 โดนคัดออก
                     if (pRound(profit) < pRound(applicableMinProfit)) continue;
                     
                     finalResults.push({
                         carrier: String(p[1]),         
                         aggregator: String(p[0]), 
                         serviceType: p[2] === '' ? '-' : String(p[2]),
-                        chargeWeight: parseFloat(chargeWeightCost.toFixed(3)), // แสดงผลน้ำหนักคิดเงิน 3 ตำแหน่ง
+                        // แปลง ChargeWeight กลับเป็น Kg เพื่อแสดงผล (ปรับเป็น 2 ตำแหน่งให้เข้ากับ UI ใหม่)
+                        chargeWeight: parseFloat((chargeWeightCostInGrams / 1000).toFixed(2)), 
                         sell: parseFloat(finalSell.toFixed(2)),
                         cost: parseFloat(finalCost.toFixed(2)),
                         profit: parseFloat(profit.toFixed(2)),
