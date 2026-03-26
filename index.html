@@ -310,17 +310,21 @@
                         <!-- Weight (Sync Inputs) -->
                         <div class="col-span-1 md:col-span-1 lg:col-span-2">
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">น้ำหนัก <span class="text-red-500">*</span></label>
-                            <div class="flex gap-2">
-                                <div class="relative flex-1">
-                                    <input type="number" id="inputGram" placeholder="0" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="syncWeight('gram', this.value)">
-                                    <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">g</span>
+                            <div class="flex flex-col gap-1">
+                                <div class="flex gap-2">
+                                    <div class="relative flex-1">
+                                        <input type="number" id="inputGram" placeholder="0" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="syncWeight('gram', this.value)">
+                                        <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">g</span>
+                                    </div>
+                                    <div class="flex items-center text-slate-400 text-sm"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                                    <div class="relative flex-1">
+                                        <!-- UI UPDATE: ปรับเป็น 2 ตำแหน่ง เพื่อความสวยงาม (step 0.01) -->
+                                        <input type="number" id="inputKg" placeholder="0.00" step="0.01" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="syncWeight('kg', this.value)">
+                                        <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">kg</span>
+                                    </div>
                                 </div>
-                                <div class="flex items-center text-slate-400 text-sm"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
-                                <div class="relative flex-1">
-                                    <!-- UI UPDATE: ปรับเป็น 2 ตำแหน่ง เพื่อความสวยงาม (step 0.01) -->
-                                    <input type="number" id="inputKg" placeholder="0.00" step="0.01" class="w-full p-2.5 pr-8 text-sm border border-slate-300 rounded-xl outline-none focus:border-blue-500 text-right" oninput="syncWeight('kg', this.value)">
-                                    <span class="absolute right-3 top-2.5 text-slate-400 text-sm font-medium">kg</span>
-                                </div>
+                                <!-- WARNING DIV: การแจ้งเตือนน้ำหนักหมิ่นเหม่ -->
+                                <div id="weightWarning" class="text-red-500 text-[11px] font-bold mt-1 hidden"></div>
                             </div>
                         </div>
 
@@ -434,17 +438,57 @@
             return Math.round((parseFloat(num) + Number.EPSILON) * 10000) / 10000;
         };
 
-        // UI UPDATE: แสดงผลหน่วยกิโลกรัมเป็น ทศนิยม 2 ตำแหน่ง เพื่อความสะอาดตา
+        // SAFETY WEIGHT WARNING LOGIC: ตรวจสอบน้ำหนักหมิ่นเหม่และแสดงแจ้งเตือน
+        function checkWeightWarning(grams) {
+            const warningEl = document.getElementById('weightWarning');
+            if (!grams || isNaN(grams) || grams <= 0) {
+                warningEl.classList.add('hidden');
+                return;
+            }
+            
+            // เช็คน้ำหนักว่าลงท้ายด้วย 990 ถึง 999 หรือไม่ (เช่น 990, 1999, 4995)
+            const remainder = grams % 1000;
+            if (remainder >= 990 && remainder <= 999) {
+                // ปัดขึ้นไปที่พันถัดไป + 10 กรัม (เช่น 4995 -> 5010)
+                const recommendedGrams = Math.ceil(grams / 1000) * 1000 + 10;
+                const recommendedKg = (recommendedGrams / 1000).toFixed(2);
+                
+                // ใส่ข้อความและแท็ก span สำหรับเน้นความสำคัญ
+                warningEl.innerHTML = `⚠️ เพื่อป้องกันการถูกปรับย้อนหลัง แนะนำให้ปัดน้ำหนักเป็น ${recommendedGrams} กรัม (${recommendedKg} กิโลกรัม)<br><span class="inline-block mt-1.5 text-red-600 underline decoration-red-300 decoration-wavy underline-offset-2">[สำคัญ] เมื่อปรับน้ำหนักแล้ว ต้องกดปุ่มคำนวณราคาใหม่ (หรือกด Enter) เพื่ออัปเดตค่าขนส่งใหม่เสมอ!</span>`;
+                warningEl.classList.remove('hidden');
+            } else {
+                warningEl.classList.add('hidden');
+            }
+        }
+
+        // UI UPDATE: แสดงผลหน่วยกิโลกรัมเป็น ทศนิยม 2 ตำแหน่ง แบบตัดทศนิยมทิ้ง (Truncate) ไม่ปัดเศษ
         function syncWeight(source, value) {
+            let grams = 0;
             if (source === 'gram') {
                 const kgInput = document.getElementById('inputKg');
-                if (!value) { kgInput.value = ''; return; }
-                kgInput.value = (parseFloat(value) / 1000).toFixed(2); // ปรับเป็น 2 ตำแหน่ง
+                if (!value) { 
+                    kgInput.value = ''; 
+                    checkWeightWarning(0);
+                    return; 
+                }
+                grams = parseInt(value, 10);
+                
+                // Truncate logic: ตัดให้เหลือ 2 ตำแหน่งโดยไม่ปัดขึ้น (เช่น 999g = 0.99kg)
+                const kgVal = Math.floor(Number(grams / 1000) * 100) / 100;
+                kgInput.value = kgVal.toFixed(2);
+                
             } else if (source === 'kg') {
                 const gramInput = document.getElementById('inputGram');
-                if (!value) { gramInput.value = ''; return; }
-                gramInput.value = Math.round(parseFloat(value) * 1000);
+                if (!value) { 
+                    gramInput.value = ''; 
+                    checkWeightWarning(0);
+                    return; 
+                }
+                
+                grams = Math.round(parseFloat(value) * 1000);
+                gramInput.value = grams;
             }
+            checkWeightWarning(grams);
         }
 
         /* =========================================================================
@@ -487,6 +531,19 @@
 
             checkExistingData();
             document.getElementById('adminPassword').addEventListener('keypress', e => { if (e.key === 'Enter') login('admin'); });
+
+            // เพิ่ม Event Listener สำหรับการกดปุ่ม Enter ให้กับช่อง Input กรอกข้อมูลเพื่อความสะดวกรวดเร็ว
+            ['inputGram', 'inputKg', 'inputW', 'inputL', 'inputH'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault(); // ป้องกันพฤติกรรมเริ่มต้นของฟอร์ม (ถ้ามี)
+                            calculatePrice(); // เรียกใช้งานฟังก์ชันคำนวณราคา
+                        }
+                    });
+                }
+            });
         });
 
         function login(role, isAutoLogin = false) { 
@@ -952,6 +1009,9 @@
             
             const dimErrorEl = document.getElementById('dimError');
             if(dimErrorEl) dimErrorEl.classList.add('hidden');
+            
+            const warningEl = document.getElementById('weightWarning');
+            if(warningEl) warningEl.classList.add('hidden');
         }
 
         function populateCarriers() {
