@@ -229,12 +229,15 @@
                 <a href="#" onclick="openSettings()" class="nav-item flex items-center px-4 py-3 text-blue-400 hover:bg-slate-800 hover:text-blue-300 rounded-xl transition-colors">
                     <i class="fa-solid fa-sliders w-6 text-center mr-2"></i> Logic Setting
                 </a>
+                <!-- NEW: ThaiPost Master Link -->
+                <a href="#" onclick="switchPage('thaipost_master')" id="nav-thaipost" class="nav-item flex items-center px-4 py-3 text-emerald-400 hover:bg-slate-800 hover:text-emerald-300 rounded-xl transition-colors mt-1">
+                    <i class="fa-solid fa-table-list w-6 text-center mr-2"></i> ตารางสรุป ThaiPost
+                </a>
             </div>
 
             <!-- Data Source (Admin Only) -->
             <div class="admin-only hidden pt-4 border-t border-slate-800" id="nav-datasource-wrapper">
                 <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2">Data Source</p>
-                <!-- Flex Row Layout (75% / 25%) - อัปเดต Data Portability -->
                 <div class="flex gap-2">
                     <button onclick="clearData()" class="w-[75%] py-2.5 px-3 bg-slate-800 hover:bg-red-600/20 hover:text-red-400 text-slate-400 text-xs font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
                         <i class="fa-solid fa-rotate-right"></i> อัปเดต Excel
@@ -284,8 +287,8 @@
         <div class="flex-1 overflow-y-auto p-4 lg:p-8 hide-scroll">
             <div class="max-w-7xl mx-auto space-y-6">
                 
-                <!-- Input Form -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 lg:p-6">
+                <!-- Input Form Wrapper -->
+                <div id="mainInputForm" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 lg:p-6">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-4">
                         <h2 class="text-base font-bold text-slate-800 border-l-4 border-blue-500 pl-3">ข้อมูลพัสดุ</h2>
                         
@@ -337,7 +340,7 @@
                             </div>
                         </div>
 
-                        <!-- WARNING DIV: ย้ายมาอยู่ระดับ Grid หลักและใช้ col-span-4 เพื่อให้ขยายเต็มบรรทัด -->
+                        <!-- WARNING DIV -->
                         <div id="weightWarning" class="col-span-1 md:col-span-2 lg:col-span-4 text-red-600 text-base md:text-lg font-bold p-3 bg-red-50 border border-red-200 rounded-xl hidden flex-col sm:flex-row items-center justify-between gap-3 shadow-sm"></div>
 
                         <!-- Zone & Calculate Button -->
@@ -407,6 +410,40 @@
                     </div>
                 </div>
 
+                <!-- ThaiPost Master Section (Admin Only) -->
+                <div id="thaipostMasterSection" class="hidden space-y-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 lg:p-6">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-800 border-l-4 border-emerald-500 pl-3">ตารางสรุปต้น ThaiPost (Rate Master)</h2>
+                                <p class="text-sm text-slate-500 mt-1">สแกนหาค่ายที่ให้ต้นทุนถูกที่สุดในแต่ละช่วงน้ำหนัก 1 - 30,000 กรัม (อ้างอิงข้อมูล Master Data ล่าสุด)</p>
+                            </div>
+                            <button onclick="generateThaiPostMaster()" class="text-sm text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-xl transition-colors flex items-center gap-2 shadow-sm font-medium shrink-0">
+                                <i class="fa-solid fa-bolt"></i> สร้างตาราง / อัปเดตข้อมูล
+                            </button>
+                        </div>
+                        
+                        <div class="overflow-y-auto overflow-x-auto rounded-xl border border-slate-200 max-h-[65vh] hide-scroll relative">
+                            <table class="w-full text-left whitespace-nowrap text-sm bg-white">
+                                <thead class="sticky top-0 z-10 shadow-sm">
+                                    <tr class="text-slate-700 border-b border-slate-200">
+                                        <th class="py-3 px-4 font-bold border-r border-slate-200 text-center w-32 bg-slate-100">ช่วงน้ำหนัก (g)</th>
+                                        <th class="py-3 px-4 font-bold border-r border-slate-200 text-center bg-blue-50">
+                                            <i class="fa-solid fa-city text-blue-500 mr-1"></i> ปลายทาง BKK
+                                        </th>
+                                        <th class="py-3 px-4 font-bold text-center bg-orange-50">
+                                            <i class="fa-solid fa-map-location-dot text-orange-500 mr-1"></i> ปลายทาง Other
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="thaipostMasterTableBody" class="divide-y divide-slate-100 text-slate-700">
+                                    <tr><td colspan="3" class="py-8 text-center text-slate-400 italic">คลิกปุ่ม "สร้างตาราง / อัปเดตข้อมูล" ด้านบนเพื่อประมวลผล...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </main>
@@ -431,13 +468,11 @@
             return cleaned; 
         }
 
-        // เก็บไว้ใช้งานสำหรับส่วนที่ไม่ใช่น้ำหนัก เช่น ขนาด (กxยxส) หรือกำไร
         const pRound = (num) => {
             if (isNaN(num) || num === null || num === undefined) return NaN;
             return Math.round((parseFloat(num) + Number.EPSILON) * 10000) / 10000;
         };
 
-        // SAFETY WEIGHT WARNING LOGIC: ตรวจสอบน้ำหนักหมิ่นเหม่และแสดงแจ้งเตือน (บรรทัดเดียวเต็มจอ)
         function checkWeightWarning(grams) {
             const warningEl = document.getElementById('weightWarning');
             if (!grams || isNaN(grams) || grams <= 0) {
@@ -446,14 +481,11 @@
                 return;
             }
             
-            // เช็คน้ำหนักว่าลงท้ายด้วย 990 ถึง 999 หรือไม่
             const remainder = grams % 1000;
             if (remainder >= 990 && remainder <= 999) {
-                // ปัดขึ้นไปที่พันถัดไป + 10 กรัม
                 const recommendedGrams = Math.ceil(grams / 1000) * 1000 + 10;
                 const recommendedKg = (recommendedGrams / 1000).toFixed(2);
                 
-                // จัดรูปแบบให้เป็นบรรทัดเดียวซ้าย-ขวา เอากรอบและไอคอนออก
                 warningEl.innerHTML = `
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-triangle-exclamation text-xl"></i> 
@@ -471,7 +503,6 @@
             }
         }
 
-        // UI UPDATE: แสดงผลหน่วยกิโลกรัมเป็น ทศนิยม 2 ตำแหน่ง แบบตัดทศนิยมทิ้ง (Truncate) ไม่ปัดเศษ
         function syncWeight(source, value) {
             let grams = 0;
             if (source === 'gram') {
@@ -482,8 +513,6 @@
                     return; 
                 }
                 grams = parseInt(value, 10);
-                
-                // Truncate logic: ตัดให้เหลือ 2 ตำแหน่งโดยไม่ปัดขึ้น (เช่น 999g = 0.99kg)
                 const kgVal = Math.floor(Number(grams / 1000) * 100) / 100;
                 kgInput.value = kgVal.toFixed(2);
                 
@@ -494,11 +523,47 @@
                     checkWeightWarning(0);
                     return; 
                 }
-                
                 grams = Math.round(parseFloat(value) * 1000);
                 gramInput.value = grams;
             }
             checkWeightWarning(grams);
+        }
+
+        // ระบบแจกจ่ายสีสันให้แต่ละค่ายแบบอัตโนมัติ
+        const aggColorPalettes = [
+            { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
+            { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' },
+            { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
+            { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
+            { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+            { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200' },
+            { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200' },
+            { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200' },
+            { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
+            { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' },
+            { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200' },
+            { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200' },
+            { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200' },
+            { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-200' }
+        ];
+
+        function getAggColorTheme(aggName) {
+            if (!aggName || aggName === '-') return { bg: 'bg-slate-50', text: 'text-slate-600', border: 'border-slate-200' };
+            
+            const upperName = aggName.toUpperCase().replace(/\s+/g, '');
+            
+            // 1. สีเฉพาะสำหรับค่ายหลัก
+            if (upperName.includes('SHIPSMILE') || upperName.includes('SMILE')) return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-300' };
+            if (upperName.includes('SMALLWIN')) return { bg: 'bg-slate-900', text: 'text-white', border: 'border-slate-800' };
+            if (upperName.includes('DPLUS')) return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-300' };
+            
+            // 2. สุ่มสีอัตโนมัติจากตัวอักษรสำหรับค่ายอื่นๆ (สีจะคงที่เสมอสำหรับชื่อค่ายเดิม)
+            let hash = 0;
+            for (let i = 0; i < upperName.length; i++) {
+                hash = upperName.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            hash = Math.abs(hash);
+            return aggColorPalettes[hash % aggColorPalettes.length];
         }
 
         /* =========================================================================
@@ -521,7 +586,6 @@
         let tempAggPrefs = [];
         let tempCarrierPrefs = [];
         
-        // MASTER DATA STATE
         window.parsedProfiles = [];
         window.parsedAggs = {};
         window.parsedSelling = {};
@@ -542,14 +606,13 @@
             checkExistingData();
             document.getElementById('adminPassword').addEventListener('keypress', e => { if (e.key === 'Enter') login('admin'); });
 
-            // เพิ่ม Event Listener สำหรับการกดปุ่ม Enter ให้กับช่อง Input กรอกข้อมูลเพื่อความสะดวกรวดเร็ว
             ['inputGram', 'inputKg', 'inputW', 'inputL', 'inputH'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) {
                     el.addEventListener('keydown', (e) => {
                         if (e.key === 'Enter') {
-                            e.preventDefault(); // ป้องกันพฤติกรรมเริ่มต้นของฟอร์ม (ถ้ามี)
-                            calculatePrice(); // เรียกใช้งานฟังก์ชันคำนวณราคา
+                            e.preventDefault(); 
+                            calculatePrice(); 
                         }
                     });
                 }
@@ -600,6 +663,9 @@
             document.getElementById('adminPassword').value = '';
             document.getElementById('loginModal').classList.remove('opacity-0', 'pointer-events-none');
             document.getElementById('resultSection').classList.add('hidden');
+            
+            // Force return to single page to hide admin features securely
+            switchPage('single');
             applyRoleUI(); 
         }
 
@@ -616,7 +682,7 @@
         }
 
         /* =========================================================================
-           3. DATA PERSISTENCE & FILE UPLOAD (REAL EXCEL PARSING)
+           3. DATA PERSISTENCE & FILE UPLOAD 
            ========================================================================= */
         function checkExistingData() {
             if (loadPersistedData()) {
@@ -676,7 +742,7 @@
                 try {
                     localStorage.setItem('originalExcelFile', e.target.result);
                 } catch(err) {
-                    console.warn('ขนาดไฟล์ใหญ่เกินโควต้า LocalStorage จะไม่สามารถดาวน์โหลดแบคอัปหลังรีเฟรชเพจได้');
+                    console.warn('ขนาดไฟล์ใหญ่เกินโควต้า LocalStorage');
                 }
             };
             base64Reader.readAsDataURL(file);
@@ -985,13 +1051,49 @@
 
         function switchPage(page) {
             state.page = page;
-            document.getElementById('nav-single').className = page === 'single' ? 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors' : 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
-            document.getElementById('nav-compare').className = page === 'compare' ? 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors' : 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
-            document.getElementById('pageTitle').innerText = page === 'single' ? 'ตรวจสอบขนส่งเดียว' : 'เปรียบเทียบทุกขนส่ง';
-            if (page === 'single') { document.getElementById('singleCarrierWrapper').classList.remove('hidden'); document.getElementById('carrierFilterSection').classList.add('hidden'); } 
-            else { document.getElementById('singleCarrierWrapper').classList.add('hidden'); document.getElementById('carrierFilterSection').classList.remove('hidden'); populateFilterList(); }
-            document.getElementById('resultSection').classList.add('hidden');
             
+            // 1. Reset Nav Styling
+            document.getElementById('nav-single').className = 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
+            document.getElementById('nav-compare').className = 'nav-item flex items-center px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors';
+            const navThaipost = document.getElementById('nav-thaipost');
+            if (navThaipost) navThaipost.className = 'nav-item flex items-center px-4 py-3 text-emerald-400 hover:bg-slate-800 hover:text-emerald-300 rounded-xl transition-colors mt-1';
+            
+            // 2. Apply Active Nav & Title
+            if (page === 'single') {
+                document.getElementById('nav-single').className = 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors';
+                document.getElementById('pageTitle').innerText = 'ตรวจสอบขนส่งเดียว';
+            } else if (page === 'compare') {
+                document.getElementById('nav-compare').className = 'nav-item flex items-center px-4 py-3 bg-blue-600 text-white rounded-xl transition-colors';
+                document.getElementById('pageTitle').innerText = 'เปรียบเทียบทุกขนส่ง';
+            } else if (page === 'thaipost_master') {
+                if (navThaipost) navThaipost.className = 'nav-item flex items-center px-4 py-3 bg-emerald-600 text-white rounded-xl transition-colors mt-1 shadow-md';
+                document.getElementById('pageTitle').innerText = 'สรุปต้นทุนต่ำสุด ThaiPost';
+            }
+
+            // 3. Toggle Page Contents
+            const mainInputForm = document.getElementById('mainInputForm');
+            const thaipostMasterSection = document.getElementById('thaipostMasterSection');
+            const resultSection = document.getElementById('resultSection');
+
+            if (page === 'thaipost_master') {
+                if (mainInputForm) mainInputForm.classList.add('hidden');
+                if (resultSection) resultSection.classList.add('hidden');
+                if (thaipostMasterSection) thaipostMasterSection.classList.remove('hidden');
+            } else {
+                if (mainInputForm) mainInputForm.classList.remove('hidden');
+                if (thaipostMasterSection) thaipostMasterSection.classList.add('hidden');
+                if (resultSection) resultSection.classList.add('hidden'); // ซ่อน Result ไว้ก่อนเสมอจนกว่าจะกดคำนวณ
+                
+                if (page === 'single') { 
+                    document.getElementById('singleCarrierWrapper').classList.remove('hidden'); 
+                    document.getElementById('carrierFilterSection').classList.add('hidden'); 
+                } else { 
+                    document.getElementById('singleCarrierWrapper').classList.add('hidden'); 
+                    document.getElementById('carrierFilterSection').classList.remove('hidden'); 
+                    populateFilterList(); 
+                }
+            }
+
             const dimErrorEl = document.getElementById('dimError');
             if(dimErrorEl) dimErrorEl.classList.add('hidden');
             
@@ -1063,14 +1165,12 @@
         }
 
         /* =========================================================================
-           6. CORE CALCULATION ENGINE (Double Constraint Engine - GRAM INTEGER LOGIC)
+           6. CORE CALCULATION ENGINE 
            ========================================================================= */
         function calculatePrice() {
-            // ดึงค่าจากช่อง Input กรัม เป็นหลัก เพื่อรักษาความแม่นยำระดับ 1 กรัม (xx001) แม้หน้าจอ Kg จะโชว์แค่ 2 ตำแหน่ง
             const gramInputVal = document.getElementById('inputGram').value;
             const kgInputVal = document.getElementById('inputKg').value;
             
-            // แปลงน้ำหนักที่กรอกเป็นจำนวนเต็ม "กรัม" ทันที เพื่อกำจัด Floating Point Error 100%
             const inputWeightGrams = gramInputVal ? Math.round(parseFloat(gramInputVal)) : Math.round(parseFloat(kgInputVal) * 1000);
             
             const w = parseFloat(document.getElementById('inputW').value) || 0;
@@ -1112,29 +1212,27 @@
                     const p = window.parsedProfiles[i];
                     if (!p || p.length < 15) continue; 
                     
-                    const agg = normalizeString(p[0]);                   // A: Aggregator
-                    const carrier = normalizeString(p[1]);               // B: Carrier
-                    const costServiceType = normalizeString(p[2]);       // C: Service_type
-                    const costStyleType = normalizeString(p[3]);         // D: Cost_Style_Type
-                    const minWeightRaw = normalizeString(p[4]);          // E: Min_weight
-                    const maxSingleSideRaw = normalizeString(p[5]);      // F: Max_single_side
-                    const maxTotalSizeRaw = normalizeString(p[6]);       // G: Max_total_size
-                    const volLimit1Raw = normalizeString(p[7]);          // H: Vol_limit_1
-                    const volDivisor1Raw = parseFloat(p[8]);             // I: Vol_divisor_1
-                    const volLimit2Raw = normalizeString(p[9]);          // J: Vol_limit_2
-                    const volDivisor2Raw = parseFloat(p[10]);            // K: Vol_divisor_2
-                    const sellingTab = normalizeString(p[11]);           // L: Selling_Tab
-                    const sellingServiceType = normalizeString(p[12]);   // M: Selling_Service_type
-                    const sellingStyleType = normalizeString(p[13]);     // N: Selling_Style_Type
-                    const isActive = normalizeString(p[14]);             // O: Is_active
+                    const agg = normalizeString(p[0]);                   
+                    const carrier = normalizeString(p[1]);               
+                    const costServiceType = normalizeString(p[2]);       
+                    const costStyleType = normalizeString(p[3]);         
+                    const minWeightRaw = normalizeString(p[4]);          
+                    const maxSingleSideRaw = normalizeString(p[5]);      
+                    const maxTotalSizeRaw = normalizeString(p[6]);       
+                    const volLimit1Raw = normalizeString(p[7]);          
+                    const volDivisor1Raw = parseFloat(p[8]);             
+                    const volLimit2Raw = normalizeString(p[9]);          
+                    const volDivisor2Raw = parseFloat(p[10]);            
+                    const sellingTab = normalizeString(p[11]);           
+                    const sellingServiceType = normalizeString(p[12]);   
+                    const sellingStyleType = normalizeString(p[13]);     
+                    const isActive = normalizeString(p[14]);             
                     
-                    if (isActive !== 'TRUE') continue; // Reject หากสถานะไม่ใช่ TRUE
+                    if (isActive !== 'TRUE') continue; 
                     
                     if (state.page === 'single' && carrier !== singleCarrier) continue;
                     if (state.page === 'compare' && state.disabledCarriers.includes(carrier)) continue;
                     
-                    // 1. Profile Check - ตรวจสอบน้ำหนักขั้นต่ำ (ใช้ Integer Logic)
-                    // สมมติฐานว่าในหน้า Profile หากระบุเป็น Kg จะคูณ 1000 เพื่อเป็นกรัมเสมอ
                     const minWeightProfile = (minWeightRaw === 'NO' || minWeightRaw === '-') ? 0 : parseFloat(minWeightRaw);
                     const minWeightProfileInGrams = Math.round(minWeightProfile * 1000); 
                     if (inputWeightGrams < minWeightProfileInGrams) continue; 
@@ -1142,16 +1240,9 @@
                     if (hasDims) {
                         const maxSingleSide = (maxSingleSideRaw === 'NO' || maxSingleSideRaw === '-' || maxSingleSideRaw === '') ? Infinity : pRound(parseFloat(maxSingleSideRaw));
                         const maxTotalSize = (maxTotalSizeRaw === 'NO' || maxTotalSizeRaw === '-' || maxTotalSizeRaw === '') ? Infinity : pRound(parseFloat(maxTotalSizeRaw));
-                        
-                        // Reject ขนาดพัสดุ
                         if (pRound(maxSide) > maxSingleSide || pRound(sizeSum) > maxTotalSize) continue; 
                     }
                     
-                    // ==========================================
-                    // 4.1 Cost Engine (ฝั่งต้นทุน)
-                    // ==========================================
-                    
-                    // คำนวณ Charge Weight (น้ำหนักคิดเงิน) ในรูปแบบ กรัม เป็นหลัก
                     let chargeWeightCostInGrams = inputWeightGrams;
                     
                     if (costStyleType === 'DIVISOR' && hasDims) {
@@ -1159,7 +1250,6 @@
                             const limit1InGrams = Math.round(parseFloat(volLimit1Raw) * 1000);
                             
                             if (inputWeightGrams <= limit1InGrams) {
-                                // คำนวณปริมาตร (W*L*H)/Divisor ผลลัพธ์เป็น Kg แปลงกลับเป็น กรัม ด้วยการคูณ 1000 ทันที
                                 const volWKg = (w * l * h) / volDivisor1Raw;
                                 const volWGrams = Math.round(volWKg * 1000);
                                 chargeWeightCostInGrams = Math.max(inputWeightGrams, volWGrams);
@@ -1171,11 +1261,9 @@
                                         const volWGrams = Math.round(volWKg * 1000);
                                         chargeWeightCostInGrams = Math.max(inputWeightGrams, volWGrams);
                                     } else {
-                                        // RESILIENT FALLBACK: น้ำหนักพ้นขีดจำกัด vol_limit ห้าม Reject ให้สลับใช้น้ำหนักจริง (หน่วยกรัม) ทันที
                                         chargeWeightCostInGrams = inputWeightGrams; 
                                     }
                                 } else {
-                                    // RESILIENT FALLBACK
                                     chargeWeightCostInGrams = inputWeightGrams; 
                                 }
                             }
@@ -1214,18 +1302,15 @@
                         if (rowService !== costServiceType) continue; 
                         if (isNaN(rowCost)) continue;
 
-                        // ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000) ปัดให้ชัวร์ว่าเป็นจำนวนเต็ม
                         const minInGrams = Math.round(parseFloat(row[0]));
                         const maxInGrams = Math.round(parseFloat(row[1]));
 
-                        // INCLUSIVE COMPARISON: >= และ <= เพื่อให้รอยต่อเป๊ะ 100%
                         if (costPriceA === null && !isNaN(minInGrams) && !isNaN(maxInGrams)) {
                             if ((chargeWeightCostInGrams >= minInGrams && chargeWeightCostInGrams <= maxInGrams) || (minInGrams <= 10 && chargeWeightCostInGrams <= 10)) {
                                 costPriceA = rowCost;
                             }
                         }
 
-                        // สแกนหาราคาที่ 2: ขนาดรวมกล่อง
                         if (hasDims && costPriceB === null) {
                             if (pRound(sizeSum) <= safeRowMaxSize) {
                                 costPriceB = rowCost;
@@ -1235,18 +1320,12 @@
                         if (costPriceA !== null && (!hasDims || costPriceB !== null)) break; 
                     }
                     
-                    // SAFE LOOKUP: ตารางราคาต้นทุนไม่มีแถวที่รองรับน้ำหนัก/ขนาดนี้ ถึงจะ Reject
                     if (costPriceA === null) continue; 
                     if (hasDims && costPriceB === null) continue;
 
                     const finalCost = hasDims ? Math.max(costPriceA, costPriceB) : costPriceA;
                     
-                    // ==========================================
-                    // 4.2 Sell Engine (ฝั่งขาย)
-                    // ==========================================
-                    
                     let sellWeightBaseInGrams = inputWeightGrams;
-                    
                     if (sellingStyleType === 'DIVISOR') {
                         sellWeightBaseInGrams = chargeWeightCostInGrams;
                     }
@@ -1271,11 +1350,9 @@
                         if (z !== zone && z !== 'ALL') continue; 
                         if (isNaN(sellVal)) continue;
 
-                        // ถือว่าค่าใน row[0] และ row[1] เป็นหน่วยกรัมอยู่แล้ว (ห้ามคูณ 1000)
                         const sMinInGrams = Math.round(parseFloat(row[0]));
                         const sMaxInGrams = Math.round(parseFloat(row[1]));
 
-                        // INCLUSIVE COMPARISON: >= และ <= เพื่อให้รอยต่อเป๊ะ 100%
                         if (sellPriceA === null && !isNaN(sMinInGrams) && !isNaN(sMaxInGrams)) {
                             if ((sellWeightBaseInGrams >= sMinInGrams && sellWeightBaseInGrams <= sMaxInGrams) || (sMinInGrams <= 10 && sellWeightBaseInGrams <= 10)) {
                                 sellPriceA = sellVal;
@@ -1291,15 +1368,10 @@
                         if (sellPriceA !== null && (!hasDims || sellPriceB !== null)) break;
                     }
                     
-                    // SAFE LOOKUP: ตารางราคาขายไม่มีแถวที่รองรับน้ำหนัก/ขนาดนี้ ถึงจะ Reject
                     if (sellPriceA === null) continue; 
                     if (hasDims && sellPriceB === null) continue; 
                     
                     const finalSell = hasDims ? Math.max(sellPriceA, sellPriceB) : sellPriceA;
-                    
-                    // ==========================================
-                    // สรุปผลกำไรขั้นต่ำและการผลักออก (Result Push)
-                    // ==========================================
                     
                     const profit = finalSell - finalCost;
                     const applicableMinProfit = (zone === 'BKK') ? state.minProfitBKK : state.minProfitOther;
@@ -1310,7 +1382,6 @@
                         carrier: String(p[1]),         
                         aggregator: String(p[0]), 
                         serviceType: p[2] === '' ? '-' : String(p[2]),
-                        // แปลง ChargeWeight กลับเป็น Kg เพื่อแสดงผล (ปรับเป็น 2 ตำแหน่งให้เข้ากับ UI ใหม่)
                         chargeWeight: parseFloat((chargeWeightCostInGrams / 1000).toFixed(2)), 
                         sell: parseFloat(finalSell.toFixed(2)),
                         cost: parseFloat(finalCost.toFixed(2)),
@@ -1351,7 +1422,7 @@
         }
 
         /* =========================================================================
-           7. RENDER RESULTS (UI RENDERER)
+           7. RENDER RESULTS 
            ========================================================================= */
         function renderTableResults(results) {
             document.getElementById('resultSection').classList.remove('hidden');
@@ -1360,7 +1431,7 @@
 
             if (results.length === 0) {
                 document.getElementById('topRecommendations').classList.add('hidden');
-                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">ไม่พบขนส่งที่รองรับเงื่อนไขนี้ หรือ กำไรต่ำกว่าที่กำหนดไว้</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">ไม่พบขนส่งที่รองรับเงื่อนไขนี้</td></tr>`;
                 return;
             }
 
@@ -1397,6 +1468,7 @@
             
             for(let i=0; i < Math.min(cardLimit, results.length); i++) {
                 const r = results[i];
+                const t = getAggColorTheme(r.aggregator);
                 let pHTML = (state.role === 'admin' && !state.isCensored) 
                     ? `<div class="text-right">
                          <p class="text-[10px] text-slate-500 font-medium mb-1">กำไร</p>
@@ -1417,7 +1489,7 @@
                         <div class="flex items-center text-sm">
                             <div class="w-6 text-slate-400 flex justify-center"><i class="fa-solid fa-layer-group"></i></div>
                             <span class="text-slate-500 w-16">ค่าย:</span>
-                            <span class="font-semibold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded text-xs ml-1">${r.aggregator}</span>
+                            <span class="font-bold border px-2 py-0.5 rounded text-xs ml-1 ${t.bg} ${t.text} ${t.border}">${r.aggregator}</span>
                         </div>
                         <div class="flex items-center text-sm">
                             <div class="w-6 text-indigo-400 flex justify-center"><i class="fa-solid fa-box-open"></i></div>
@@ -1439,12 +1511,162 @@
             results.forEach((r, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = idx === 0 ? 'bg-green-50' : 'hover:bg-slate-50 transition-colors';
+                const t2 = getAggColorTheme(r.aggregator);
                 let cHTML = (state.role === 'admin' && !state.isCensored) ? `<td class="py-3 px-6 text-right font-medium text-red-500">฿${r.cost.toFixed(2)}</td><td class="py-3 px-6 text-right font-bold text-green-600">฿${r.profit.toFixed(2)}</td>` : '';
-                tr.innerHTML = `<td class="py-3 px-6">${idx === 0 ? `<span class="bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fa-solid fa-star text-[10px]"></i> Best</span>` : (idx + 1)}</td><td class="py-3 px-6 font-bold text-slate-800">${r.carrier}</td><td class="py-3 px-6 text-slate-500 text-sm">${r.aggregator}</td><td class="py-3 px-6 text-indigo-600 font-semibold text-sm bg-indigo-50 rounded px-2">${r.serviceType}</td><td class="py-3 px-6 text-right font-bold text-blue-600">฿${r.sell.toFixed(2)}</td>${cHTML}`;
+                tr.innerHTML = `<td class="py-3 px-6">${idx === 0 ? `<span class="bg-green-500 text-white text-xs px-2 py-1 rounded-full"><i class="fa-solid fa-star text-[10px]"></i> Best</span>` : (idx + 1)}</td><td class="py-3 px-6 font-bold text-slate-800">${r.carrier}</td><td class="py-3 px-6"><span class="font-bold border px-2 py-1 rounded-md text-xs ${t2.bg} ${t2.text} ${t2.border}">${r.aggregator}</span></td><td class="py-3 px-6 text-indigo-600 font-semibold text-sm bg-indigo-50 rounded px-2">${r.serviceType}</td><td class="py-3 px-6 text-right font-bold text-blue-600">฿${r.sell.toFixed(2)}</td>${cHTML}`;
                 tbody.appendChild(tr);
             });
             applyRoleUI();
         }
+
+        /* =========================================================================
+           8. THAIPOST RATE MASTER (Admin Feature)
+           ========================================================================= */
+        function findBestThaiPostCost(weightGrams, zone) {
+            let bestCost = Infinity;
+            let bestAgg = '-';
+            let bestService = '-';
+
+            // วนลูป Profile ทั้งหมดเหมือนการค้นหาปกติ แต่กรองเฉพาะ THAIPOST
+            for (let i = 1; i < window.parsedProfiles.length; i++) {
+                const p = window.parsedProfiles[i];
+                if (!p || p.length < 15) continue;
+                
+                const isActive = normalizeString(p[14]);
+                const carrier = normalizeString(p[1]);
+                if (isActive !== 'TRUE' || carrier !== 'THAIPOST') continue;
+
+                const agg = normalizeString(p[0]);
+                const costServiceType = normalizeString(p[2]);
+                const minWeightRaw = normalizeString(p[4]);
+                
+                // เช็ค Profile Min weight
+                const minWeightProfile = (minWeightRaw === 'NO' || minWeightRaw === '-') ? 0 : parseFloat(minWeightRaw);
+                const minWeightProfileInGrams = Math.round(minWeightProfile * 1000); 
+                if (weightGrams < minWeightProfileInGrams) continue;
+
+                const aggSheet = window.parsedAggs[agg];
+                if (!aggSheet) continue;
+                
+                const headerRow1 = aggSheet[1];
+                if (!headerRow1) continue;
+                
+                let baseIndex = -1;
+                for (let c = 0; c < headerRow1.length; c++) {
+                    if (normalizeString(headerRow1[c]) === carrier) {
+                        baseIndex = c; break;
+                    }
+                }
+                if (baseIndex === -1) continue;
+
+                let currentProfileBestCost = null;
+
+                // สแกนหาราคาต้นทุนในชีทของค่ายนั้น
+                for (let r = 3; r < aggSheet.length; r++) {
+                    const row = aggSheet[r];
+                    if (!row || row.length === 0) continue;
+                    
+                    const z = normalizeString(row[2]);
+                    const rowCost = parseFloat(row[baseIndex + 0]);
+                    const rowService = normalizeString(row[baseIndex + 2]);
+                    
+                    if (z !== zone && z !== 'ALL') continue;
+                    if (rowService !== costServiceType) continue;
+                    if (isNaN(rowCost)) continue;
+
+                    const minInGrams = Math.round(parseFloat(row[0]));
+                    const maxInGrams = Math.round(parseFloat(row[1]));
+
+                    if (!isNaN(minInGrams) && !isNaN(maxInGrams)) {
+                        // Inclusive matching
+                        if ((weightGrams >= minInGrams && weightGrams <= maxInGrams) || (minInGrams <= 10 && weightGrams <= 10)) {
+                            currentProfileBestCost = rowCost;
+                            break; 
+                        }
+                    }
+                }
+
+                if (currentProfileBestCost !== null && currentProfileBestCost < bestCost) {
+                    bestCost = currentProfileBestCost;
+                    bestAgg = agg;
+                    bestService = costServiceType;
+                }
+            }
+
+            return bestCost === Infinity ? null : { cost: bestCost, aggregator: bestAgg, serviceType: bestService };
+        }
+
+        function generateThaiPostMaster() {
+            if (state.role !== 'admin') {
+                alert('สงวนสิทธิ์เฉพาะ Admin เท่านั้น');
+                return;
+            }
+            if (!window.parsedProfiles || window.parsedProfiles.length === 0) {
+                alert('ไม่พบข้อมูล Master Data กรุณาอัปโหลดไฟล์ Excel ก่อน');
+                return;
+            }
+
+            showLoading('กำลังสแกนและประมวลผลเรทราคา ThaiPost ทั้งหมด...');
+
+            setTimeout(() => {
+                const tbody = document.getElementById('thaipostMasterTableBody');
+                tbody.innerHTML = '';
+
+                // สร้าง Array ช่วงน้ำหนัก (Intervals) 1-30kg
+                const intervals = [];
+                intervals.push({ min: 1, max: 500 });
+                intervals.push({ min: 501, max: 1000 });
+                for (let i = 1; i < 30; i++) {
+                    intervals.push({ min: (i * 1000) + 1, max: (i + 1) * 1000 });
+                }
+
+                intervals.forEach(int => {
+                    // ใช้ค่าน้ำหนักสูงสุดของช่วงในการดึงเรท (Max of interval)
+                    const testWeight = int.max;
+                    
+                    const resBKK = findBestThaiPostCost(testWeight, 'BKK');
+                    const resOther = findBestThaiPostCost(testWeight, 'OTHER');
+
+                    const renderCell = (res, isMiddle) => {
+                        const borderClass = isMiddle ? "border-r border-slate-200" : "";
+                        if (!res) return `<td class="py-3 px-4 text-center text-slate-400 ${borderClass}">- ไม่มีข้อมูล -</td>`;
+                        
+                        const theme = getAggColorTheme(res.aggregator);
+
+                        return `
+                            <td class="py-3 px-4 ${borderClass}">
+                                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                    <div class="text-left leading-tight">
+                                        <div class="font-bold text-xs px-2 py-1 rounded-md border inline-block mb-1 truncate max-w-[140px] ${theme.bg} ${theme.text} ${theme.border}" title="${res.aggregator}">${res.aggregator}</div>
+                                        <div class="block">
+                                            <span class="text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded inline-block">${res.serviceType}</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right shrink-0">
+                                        <span class="text-[10px] text-slate-500 block mb-0.5">ต้นทุนต่ำสุด</span>
+                                        <span class="font-black text-red-600 text-base tracking-tight">฿${res.cost.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                    };
+
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 transition-colors";
+                    tr.innerHTML = `
+                        <td class="py-4 px-4 font-semibold text-slate-700 border-r border-slate-200 text-center whitespace-nowrap bg-slate-50/30">
+                            ${int.min.toLocaleString()} - ${int.max.toLocaleString()}
+                        </td>
+                        ${renderCell(resBKK, true)}
+                        ${renderCell(resOther, false)}
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                hideLoading();
+            }, 300); // ดีเลย์เล็กน้อยเพื่อให้ UI แสดง Loading
+        }
+
     </script>
     
     <!-- Startup Check -->
